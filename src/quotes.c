@@ -88,30 +88,30 @@ static int quotes_recv(struct socket *sock, unsigned char *buf, int len) {
 static void quotes_sock_data_ready(struct sock *sk, int unused) {
 	struct client *c = (struct client *)sk->sk_user_data;
 
-	printk(KERN_INFO "<%s> state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
 	if (sk->sk_state != TCP_CLOSE && sk->sk_state != TCP_CLOSE_WAIT)
 		atomic_inc((atomic_t *)&c->dataready);
 }
 
 /* FIXME */
 static void quotes_sock_write_space(struct sock *sk) {
-	printk(KERN_INFO "<%s> state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
 }
 
 /* FIXME */
 static void quotes_sock_state_change(struct sock *sk) {
 	struct client *c = (struct client *)sk->sk_user_data;
 
-	printk(KERN_INFO "<%s> state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
 	switch (sk->sk_state) {
 	case TCP_CLOSE:
-		printk(KERN_INFO "<%s> TCP_CLOSE", __func__);
+		printk(KERN_INFO "[%s] TCP_CLOSE", __func__);
 	case TCP_CLOSE_WAIT:
-		printk(KERN_INFO "<%s> TCP_CLOSE_WAIT", __func__);
+		printk(KERN_INFO "[%s] TCP_CLOSE_WAIT", __func__);
 		atomic_set((atomic_t *)&c->disconnected, 1);
 		break;
 	case TCP_ESTABLISHED:
-		printk(KERN_INFO "<%s> TCP_ESTABLISHED", __func__);
+		printk(KERN_INFO "[%s] TCP_ESTABLISHED", __func__);
 		atomic_set((atomic_t *)&c->connected, 1);
 		break;
 	default:
@@ -257,7 +257,7 @@ static void process_inbuf(struct client *c) {
 				} else
 					c->debuf[j++] = start[i];
 			for (i = 0; i + 7 < j; i += 8)
-				printk(KERN_INFO "<%s> [%d] %02x %02x %02x %02x %02x %02x %02x %02x",
+				printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
 					__func__, j,
 					c->debuf[i],
 					c->debuf[i + 1],
@@ -268,12 +268,12 @@ static void process_inbuf(struct client *c) {
 					c->debuf[i + 6],
 					c->debuf[i + 7]);
 			for (; i < j; ++i)
-				printk(KERN_INFO "<%s> [%d] %02x ", __func__, j, c->debuf[i]);
+				printk(KERN_INFO "[%s] <%d> %02x ", __func__, j, c->debuf[i]);
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
-			printk(KERN_INFO "<%s> receiving heartbeat", __func__);
+			printk(KERN_INFO "[%s] receiving heartbeat", __func__);
 			ftd_cont_len = ftd_extd_len;
 		} else
-			printk(KERN_ERR "<%s> unknown packet type = 0x%02x, length = %d",
+			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d",
 				__func__, ftd_type, ftd_cont_len);
 		start    += ftd_cont_len + 4;
 		c->inpos -= ftd_cont_len + 4;
@@ -298,7 +298,7 @@ static int quotes_connect(struct client *c) {
 	struct sockaddr_in s;
 
 	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &c->sock) < 0) {
-		printk(KERN_ERR "<%s> error creating quotes socket", __func__);
+		printk(KERN_ERR "[%s] error creating quotes socket", __func__);
 		return -EIO;
 	}
 	/* FIXME */
@@ -329,7 +329,7 @@ loop:
 			/* FIXME */
 			if (ret == -EINPROGRESS) {
 			} else if (ret < 0) {
-				printk(KERN_ERR "<%s> error reconnecting", __func__);
+				printk(KERN_ERR "[%s] error reconnecting", __func__);
 				goto loop;
 			}
 			/* FIXME */
@@ -337,7 +337,7 @@ loop:
 			atomic_set((atomic_t *)&c->disconnected, 0);
 		}
 		if (atomic_read((atomic_t *)&c->heartbeat)) {
-			printk(KERN_INFO "<%s> sending heartbeat", __func__);
+			printk(KERN_INFO "[%s] sending heartbeat", __func__);
 			send_heartbeat(c);
 			atomic_set((atomic_t *)&c->heartbeat, 0);
 		}
@@ -357,9 +357,9 @@ loop:
 			c->timer.function = timer_func;
 			c->timer.data     = (unsigned long)c;
 			add_timer(&c->timer);
-			printk(KERN_INFO "<%s> sending heartbeat timeout", __func__);
+			printk(KERN_INFO "[%s] sending heartbeat timeout", __func__);
 			send_hbtimeout(c);
-			printk(KERN_INFO "<%s> logging in", __func__);
+			printk(KERN_INFO "[%s] logging in", __func__);
 			login(c);
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
@@ -372,7 +372,7 @@ static int __init quotes_init(void) {
 
 	if (front_ip == NULL || front_port == 0 || brokerid == NULL ||
 		userid == NULL || passwd == NULL) {
-		printk(KERN_ERR "<%s> front_ip, front_port, brokerid, "
+		printk(KERN_ERR "[%s] front_ip, front_port, brokerid, "
 			"userid or passwd can't be NULL", __func__);
 		return -EINVAL;
 	}
@@ -380,14 +380,14 @@ static int __init quotes_init(void) {
 	/* FIXME */
 	if (ret == -EINPROGRESS) {
 	} else if (ret < 0) {
-		printk(KERN_ERR "<%s> error connecting", __func__);
+		printk(KERN_ERR "[%s] error connecting", __func__);
 		goto end;
 	}
 	/* FIXME */
 	kernel_setsockopt(sh.sock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
 	sh.task = kthread_create(recv_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
-		printk(KERN_ERR "<%s> error creating quotes thread", __func__);
+		printk(KERN_ERR "[%s] error creating quotes thread", __func__);
 		goto end;
 	}
 	kthread_bind(sh.task, 1);
