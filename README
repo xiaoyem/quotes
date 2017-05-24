@@ -1,2 +1,5 @@
 
 Kernel module for futures quotes
+
+insmod src/quotes.ko front_ip=<ip> front_port=<port> brokerid=<broker> userid=<user> passwd=<pass>
+
