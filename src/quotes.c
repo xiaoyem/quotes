@@ -42,10 +42,10 @@ struct client {
 	struct socket		*sock;
 	struct task_struct	*task;
 	struct timer_list	timer;
-	u32			disconnected;
 	u32			heartbeat;
 	u32			dataready;
 	u32			connected;
+	u32			disconnected;
 	u32			inpos;
 	unsigned char		inbuf[64 * 1024 * 1024];
 	unsigned char		debuf[8192];
@@ -54,12 +54,13 @@ struct client {
 /* FIXME */
 static char *front_ip;
 static int front_port;
-static char *brokerid, *userid, *passwd;
+static char *brokerid, *userid, *passwd, *contract;
 module_param(front_ip, charp, 0000);
 module_param(front_port, int, 0000);
 module_param(brokerid, charp, 0000);
 module_param(userid,   charp, 0000);
 module_param(passwd,   charp, 0000);
+module_param(contract, charp, 0000);
 static struct client sh;
 
 /* FIXME */
@@ -224,6 +225,30 @@ static void login(struct client *c) {
 	quotes_send(c->sock, (unsigned char *)&lo, sizeof lo);
 }
 
+/* FIXME */
+static void subscribe(struct client *c) {
+	struct subscribe sb;
+
+	memset(&sb, '\0', sizeof sb);
+	sb.header.ftd_type         = 0x02;
+	sb.header.ftd_extd_length  = 0x00;
+	sb.header.ftd_cont_length  = 0x3900;
+	sb.header.version          = 0x01;
+	sb.header.ftdc_type        = 0x00;
+	sb.header.unenc_length     = 0x0b;
+	sb.header.chain            = 0x4c;
+	sb.header.seq_series       = 0x0000;
+	sb.header.seq_number       = 0x01440000;
+	sb.header.prv_number       = 0x00000000;
+	sb.header.fld_count        = 0x0100;
+	sb.header.ftdc_cont_length = 0x2300;
+	sb.header.rid              = 0x00000000;
+	sb.type                    = 0x4124;
+	sb.length                  = 0x1f00;
+	memcpy(sb.instruid, contract, sizeof sb.instruid - 1);
+	quotes_send(c->sock, (unsigned char *)&sb, sizeof sb);
+}
+
 static void process_inbuf(struct client *c) {
 	unsigned char *start = c->inbuf;
 
@@ -236,6 +261,7 @@ static void process_inbuf(struct client *c) {
 			break;
 		if (ftd_type == 0x02 && ftd_extd_len == 0x00 && ftd_cont_len > 0) {
 			int i, j;
+			struct shfeheader *sh = (struct shfeheader *)c->debuf;
 
 			/* FIXME */
 			c->debuf[0] = start[0];
@@ -269,6 +295,16 @@ static void process_inbuf(struct client *c) {
 					c->debuf[i + 7]);
 			for (; i < j; ++i)
 				printk(KERN_INFO "[%s] <%d> %02x ", __func__, j, c->debuf[i]);
+			switch(sh->seq_number) {
+			case 0x01300000:
+				{
+					struct info *info = (struct info *)(sh->buf + 4);
+
+					if (info->errid == 0)
+						subscribe(c);
+				}
+				break;
+			}
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
 			printk(KERN_INFO "[%s] receiving heartbeat", __func__);
 			ftd_cont_len = ftd_extd_len;
@@ -314,28 +350,6 @@ static int recv_thread(void *data) {
 	struct client *c = (struct client *)data;
 
 	while (!kthread_should_stop()) {
-		if (atomic_read((atomic_t *)&c->disconnected)) {
-			int ret, one = 1;
-
-			if (timer_pending(&c->timer))
-				del_timer(&c->timer);
-			atomic_set((atomic_t *)&c->heartbeat, 0);
-
-loop:
-			sock_release(c->sock);
-			/* FIXME */
-			schedule_timeout_uninterruptible(10000);
-			ret = quotes_connect(c);
-			/* FIXME */
-			if (ret == -EINPROGRESS) {
-			} else if (ret < 0) {
-				printk(KERN_ERR "[%s] error reconnecting", __func__);
-				goto loop;
-			}
-			/* FIXME */
-			kernel_setsockopt(c->sock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
-			atomic_set((atomic_t *)&c->disconnected, 0);
-		}
 		if (atomic_read((atomic_t *)&c->heartbeat)) {
 			printk(KERN_INFO "[%s] sending heartbeat", __func__);
 			send_heartbeat(c);
@@ -345,6 +359,7 @@ loop:
 			int len;
 
 			len = quotes_recv(c->sock, c->inbuf + c->inpos, sizeof c->inbuf - c->inpos);
+			/* FIXME */
 			if (len) {
 				c->inpos += len;
 				process_inbuf(c);
@@ -363,6 +378,27 @@ loop:
 			login(c);
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
+		if (atomic_read((atomic_t *)&c->disconnected)) {
+			int ret, one = 1;
+
+			if (timer_pending(&c->timer))
+				del_timer(&c->timer);
+			atomic_set((atomic_t *)&c->heartbeat, 0);
+
+loop:
+			sock_release(c->sock);
+			/* FIXME */
+			schedule_timeout_uninterruptible(10 * HZ);
+			/* FIXME */
+			if ((ret = quotes_connect(c)) == -EINPROGRESS) {
+			} else if (ret < 0) {
+				printk(KERN_ERR "[%s] error reconnecting", __func__);
+				goto loop;
+			}
+			/* FIXME */
+			kernel_setsockopt(c->sock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+			atomic_set((atomic_t *)&c->disconnected, 0);
+		}
 	}
 	return 0;
 }
@@ -371,14 +407,14 @@ static int __init quotes_init(void) {
 	int ret, one = 1;
 
 	if (front_ip == NULL || front_port == 0 || brokerid == NULL ||
-		userid == NULL || passwd == NULL) {
+		userid == NULL || passwd == NULL || contract == NULL) {
 		printk(KERN_ERR "[%s] front_ip, front_port, brokerid, "
-			"userid or passwd can't be NULL", __func__);
+			"userid, passwd or contract can't be NULL", __func__);
 		return -EINVAL;
 	}
-	ret = quotes_connect(&sh);
 	/* FIXME */
-	if (ret == -EINPROGRESS) {
+	if ((ret = quotes_connect(&sh)) == -EINPROGRESS) {
+		udelay(5000);
 	} else if (ret < 0) {
 		printk(KERN_ERR "[%s] error connecting", __func__);
 		goto end;

@@ -87,6 +87,16 @@ struct login {
 	short			seq_series4;
 	int			seq_number4;
 };
+struct subscribe {
+	struct shfeheader	header;
+	unsigned short		type;
+	unsigned short		length;
+	char			instruid[31];     /* InstrumentID */
+};
+struct info {
+	int			errid;            /* ErrorID */
+	char			errmsg[81];       /* ErrorMsg */
+};
 #pragma pack(pop)
 
 #endif /* SHFE_INCLUDED */
