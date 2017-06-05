@@ -245,7 +245,7 @@ static void subscribe(struct client *c) {
 	sb.header.rid              = 0x00000000;
 	sb.type                    = 0x4124;
 	sb.length                  = 0x1f00;
-	memcpy(sb.instruid, contract, sizeof sb.instruid - 1);
+	memcpy(sb.instid, contract, sizeof sb.instid - 1);
 	quotes_send(c->sock, (unsigned char *)&sb, sizeof sb);
 }
 
@@ -257,6 +257,7 @@ static void process_inbuf(struct client *c) {
 		unsigned char  ftd_extd_len = start[1];
 		unsigned short ftd_cont_len = ntohs(*((unsigned short *)(start + 2)));
 
+		/* packet is incomplete */
 		if (c->inpos < ftd_cont_len + 4)
 			break;
 		if (ftd_type == 0x02 && ftd_extd_len == 0x00 && ftd_cont_len > 0) {
@@ -302,6 +303,20 @@ static void process_inbuf(struct client *c) {
 
 					if (info->errid == 0)
 						subscribe(c);
+				}
+				break;
+			case 0x02440000:
+				{
+					struct info *info = (struct info *)(sh->buf + 4);
+					char *contract = (char *)(sh->buf + 4 + sizeof *info + 4);
+
+					if (info->errid == 0)
+						printk(KERN_INFO "[%s] subscribe '%s' OK",
+							__func__, contract);
+				}
+				break;
+			case 0x01f10000:
+				{
 				}
 				break;
 			}
@@ -388,7 +403,7 @@ static int recv_thread(void *data) {
 loop:
 			sock_release(c->sock);
 			/* FIXME */
-			schedule_timeout_uninterruptible(10 * HZ);
+			schedule_timeout_uninterruptible(15 * HZ);
 			/* FIXME */
 			if ((ret = quotes_connect(c)) == -EINPROGRESS) {
 			} else if (ret < 0) {
@@ -414,7 +429,6 @@ static int __init quotes_init(void) {
 	}
 	/* FIXME */
 	if ((ret = quotes_connect(&sh)) == -EINPROGRESS) {
-		udelay(5000);
 	} else if (ret < 0) {
 		printk(KERN_ERR "[%s] error connecting", __func__);
 		goto end;

@@ -91,11 +91,57 @@ struct subscribe {
 	struct shfeheader	header;
 	unsigned short		type;
 	unsigned short		length;
-	char			instruid[31];     /* InstrumentID */
+	char			instid[31];       /* InstrumentID */
 };
 struct info {
 	int			errid;            /* ErrorID */
 	char			errmsg[81];       /* ErrorMsg */
+};
+struct quote {
+	char			td_day[9];        /* TradingDay */
+	char			instid[31];       /* InstrumentID */
+	char			excid[9];         /* ExchangeID */
+	char			exc_instid[31];   /* ExchangeInstID */
+	double			last;             /* LastPrice */
+	double			presettle;        /* PreSettlementPrice */
+	double			preclose;         /* PreClosePrice */
+	double			preopenint;       /* PreOpenInterest */
+	double			open;             /* OpenPrice */
+	double			high;             /* HighestPrice */
+	double			low;              /* LowestPrice */
+	int			volume;           /* Volume */
+	double			turnover;         /* Turnover */
+	double			openint;          /* OpenInterest */
+	double			close;            /* ClosePrice */
+	double			settle;           /* SettlementPrice */
+	double			upperlimit;       /* UpperLimitPrice */
+	double			lowerlimit;       /* LowerLimitPrice */
+	double			predelta;         /* PreDelta */
+	double			delta;            /* CurrDelta */
+	char			time[9];          /* UpdateTime */
+	int			msec;             /* UpdateMillisec */
+	double			bid1;             /* BidPrice1 */
+	int			bvol1;            /* BidVolume1 */
+	double			ask1;             /* AskPrice1 */
+	int			avol1;            /* AskVolume1 */
+	double			bid2;             /* BidPrice2 */
+	int			bvol2;            /* BidVolume2 */
+	double			ask2;             /* AskPrice2 */
+	int			avol2;            /* AskVolume2 */
+	double			bid3;             /* BidPrice3 */
+	int			bvol3;            /* BidVolume3 */
+	double			ask3;             /* AskPrice3 */
+	int			avol3;            /* AskVolume3 */
+	double			bid4;             /* BidPrice4 */
+	int			bvol4;            /* BidVolume4 */
+	double			ask4;             /* AskPrice4 */
+	int			avol4;            /* AskVolume4 */
+	double			bid5;             /* BidPrice5 */
+	int			bvol5;            /* BidVolume5 */
+	double			ask5;             /* AskPrice5 */
+	int			avol5;            /* AskVolume5 */
+	double			average;          /* AveragePrice */
+	char			at_day[9];        /* ActionDay */
 };
 #pragma pack(pop)
 
