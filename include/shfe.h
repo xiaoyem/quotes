@@ -143,6 +143,65 @@ struct quote {
 	double			average;          /* AveragePrice */
 	char			at_day[9];        /* ActionDay */
 };
+struct mdbase {
+	char			td_day[9];        /* TradingDay */
+	double			presettle;        /* PreSettlementPrice */
+	double			preclose;         /* PreClosePrice */
+	double			preopenint;       /* PreOpenInterest */
+	double			predelta;         /* PreDelta */
+};
+struct mdstatic {
+	double			open;             /* OpenPrice */
+	double			high;             /* HighestPrice */
+	double			low;              /* LowestPrice */
+	double			close;            /* ClosePrice */
+	double			upperlimit;       /* UpperLimitPrice */
+	double			lowerlimit;       /* LowerLimitPrice */
+	double			settle;           /* SettlementPrice */
+	double			delta;            /* CurrDelta */
+};
+struct mdlast {
+	double			last;             /* LastPrice */
+	int			volume;           /* Volume */
+	double			turnover;         /* Turnover */
+	double			openint;          /* OpenInterest */
+};
+struct mdbest {
+	double			bid1;             /* BidPrice1 */
+	int			bvol1;            /* BidVolume1 */
+	double			ask1;             /* AskPrice1 */
+	int			avol1;            /* AskVolume1 */
+};
+struct mdbid23 {
+	double			bid2;             /* BidPrice2 */
+	int			bvol2;            /* BidVolume2 */
+	double			bid3;             /* BidPrice3 */
+	int			bvol3;            /* BidVolume3 */
+};
+struct mdask23 {
+	double			ask2;             /* AskPrice2 */
+	int			avol2;            /* AskVolume2 */
+	double			ask3;             /* AskPrice3 */
+	int			avol3;            /* AskVolume3 */
+};
+struct mdbid45 {
+	double			bid4;             /* BidPrice4 */
+	int			bvol4;            /* BidVolume4 */
+	double			bid5;             /* BidPrice5 */
+	int			bvol5;            /* BidVolume5 */
+};
+struct mdask45 {
+	double			ask4;             /* AskPrice4 */
+	int			avol4;            /* AskVolume4 */
+	double			ask5;             /* AskPrice5 */
+	int			avol5;            /* AskVolume5 */
+};
+struct mdtime {
+	char			instid[31];       /* InstrumentID */
+	char			time[9];          /* UpdateTime */
+	int			msec;             /* UpdateMillisec */
+	char			at_day[9];        /* ActionDay */
+};
 #pragma pack(pop)
 
 #endif /* SHFE_INCLUDED */

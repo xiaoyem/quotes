@@ -42,6 +42,7 @@ struct client {
 	struct socket		*sock;
 	struct task_struct	*task;
 	struct timer_list	timer;
+	struct quote		quote;
 	u32			heartbeat;
 	u32			dataready;
 	u32			connected;
@@ -249,6 +250,133 @@ static void subscribe(struct client *c) {
 	quotes_send(c->sock, (unsigned char *)&sb, sizeof sb);
 }
 
+/* FIXME */
+static void print_buf(unsigned char *buf, int len) {
+	int i;
+
+	for (i = 0; i + 7 < len; i += 8)
+		printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
+			__func__, len,
+			buf[i],
+			buf[i + 1],
+			buf[i + 2],
+			buf[i + 3],
+			buf[i + 4],
+			buf[i + 5],
+			buf[i + 6],
+			buf[i + 7]);
+	for (; i < len; ++i)
+		printk(KERN_INFO "[%s] <%d> %02x ", __func__, len, buf[i]);
+}
+
+/* FIXME */
+static void handle_mdpacket(struct client *c, unsigned short *type) {
+	switch (*type) {
+	case 0x3124:
+		{
+			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
+
+			memcpy(c->quote.td_day, mdbase->td_day, sizeof c->quote.td_day);
+			c->quote.presettle  = mdbase->presettle;
+			c->quote.preclose   = mdbase->preclose;
+			c->quote.preopenint = mdbase->preopenint;
+			c->quote.predelta   = mdbase->predelta;
+		}
+		break;
+	case 0x3224:
+		{
+			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
+
+			c->quote.open       = mdstatic->open;
+			c->quote.high       = mdstatic->high;
+			c->quote.low        = mdstatic->low;
+			c->quote.close      = mdstatic->close;
+			c->quote.upperlimit = mdstatic->upperlimit;
+			c->quote.lowerlimit = mdstatic->lowerlimit;
+			c->quote.settle     = mdstatic->settle;
+			c->quote.delta      = mdstatic->delta;
+		}
+		break;
+	case 0x3324:
+		{
+			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
+
+			c->quote.last       = mdlast->last;
+			c->quote.volume     = mdlast->volume;
+			c->quote.turnover   = mdlast->turnover;
+			c->quote.openint    = mdlast->openint;
+		}
+		break;
+	case 0x3424:
+		{
+			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
+
+			c->quote.bid1       = mdbest->bid1;
+			c->quote.bvol1      = mdbest->bvol1;
+			c->quote.ask1       = mdbest->ask1;
+			c->quote.avol1      = mdbest->avol1;
+		}
+		break;
+	case 0x3524:
+		{
+			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
+
+			c->quote.bid2       = mdbid23->bid2;
+			c->quote.bvol2      = mdbid23->bvol2;
+			c->quote.bid3       = mdbid23->bid3;
+			c->quote.bvol3      = mdbid23->bvol3;
+		}
+		break;
+	case 0x3624:
+		{
+			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
+
+			c->quote.ask2       = mdask23->ask2;
+			c->quote.avol2      = mdask23->avol2;
+			c->quote.ask3       = mdask23->ask3;
+			c->quote.avol3      = mdask23->avol3;
+		}
+		break;
+	case 0x3724:
+		{
+			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
+
+			c->quote.bid4       = mdbid45->bid4;
+			c->quote.bvol4      = mdbid45->bvol4;
+			c->quote.bid5       = mdbid45->bid5;
+			c->quote.bvol5      = mdbid45->bvol5;
+		}
+		break;
+	case 0x3824:
+		{
+			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
+
+			c->quote.ask4       = mdask45->ask4;
+			c->quote.avol4      = mdask45->avol4;
+			c->quote.ask5       = mdask45->ask5;
+			c->quote.avol5      = mdask45->avol5;
+		}
+		break;
+	case 0x3924:
+		{
+			struct mdtime *mdtime = (struct mdtime *)((unsigned char *)type + 4);
+
+			memcpy(c->quote.instid, mdtime->instid, sizeof c->quote.instid);
+			memcpy(c->quote.time,   mdtime->time,   sizeof c->quote.time);
+			c->quote.msec       = mdtime->msec;
+			memcpy(c->quote.at_day, mdtime->at_day, sizeof c->quote.at_day);
+		}
+		break;
+	case 0x8124:
+		{
+			double *average = (double *)((unsigned char *)type + 4);
+
+			c->quote.average    = *average;
+		}
+		break;
+	}
+}
+
 static void process_inbuf(struct client *c) {
 	unsigned char *start = c->inbuf;
 
@@ -283,20 +411,8 @@ static void process_inbuf(struct client *c) {
 						c->debuf[j++] = 0x00;
 				} else
 					c->debuf[j++] = start[i];
-			for (i = 0; i + 7 < j; i += 8)
-				printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
-					__func__, j,
-					c->debuf[i],
-					c->debuf[i + 1],
-					c->debuf[i + 2],
-					c->debuf[i + 3],
-					c->debuf[i + 4],
-					c->debuf[i + 5],
-					c->debuf[i + 6],
-					c->debuf[i + 7]);
-			for (; i < j; ++i)
-				printk(KERN_INFO "[%s] <%d> %02x ", __func__, j, c->debuf[i]);
-			switch(sh->seq_number) {
+			print_buf(c->debuf, j);
+			switch (sh->seq_number) {
 			case 0x01300000:
 				{
 					struct info *info = (struct info *)(sh->buf + 4);
@@ -310,13 +426,42 @@ static void process_inbuf(struct client *c) {
 					struct info *info = (struct info *)(sh->buf + 4);
 					char *contract = (char *)(sh->buf + 4 + sizeof *info + 4);
 
-					if (info->errid == 0)
-						printk(KERN_INFO "[%s] subscribe '%s' OK",
+					if (info->errid != 0)
+						printk(KERN_INFO "[%s] subscribe '%s' NOT OK",
 							__func__, contract);
 				}
 				break;
 			case 0x01f10000:
 				{
+					unsigned short *type   = (unsigned short *)sh->buf;
+					unsigned short *length = (unsigned short *)(sh->buf + 2);
+					struct quote *quote    = (struct quote *)(sh->buf + 4);
+
+					if (*type == 0x1200 && *length == 0x6201) {
+						unsigned char *p;
+
+						c->quote = *quote;
+						p = (unsigned char *)&c->quote;
+						print_buf(p, sizeof c->quote);
+					}
+				}
+				break;
+			case 0x03f10000:
+				{
+					unsigned short count   = ntohs(sh->fld_count);
+					unsigned short *type   = (unsigned short *)sh->buf;
+					unsigned short *length = (unsigned short *)(sh->buf + 2);
+					unsigned char *p;
+
+					for (i = 0; i < count; ++i) {
+						handle_mdpacket(c, type);
+						type = (unsigned short *)((unsigned char *)type +
+							4 + ntohs(*length));
+						length = (unsigned short *)((unsigned char *)type +
+							2);
+					}
+					p = (unsigned char *)&c->quote;
+					print_buf(p, sizeof c->quote);
 				}
 				break;
 			}
