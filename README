@@ -2,6 +2,7 @@
 Kernel module for futures quotes
 
 echo 3 >/proc/sys/net/ipv4/tcp_syn_retries
-insmod src/quotes.ko mc_ip=<ip> mc_port=<port> quote_ip=<ip> quote_port=<port> \
-brokerid=<broker> userid=<user> passwd=<pass> contract=<cont>
+insmod src/quotes.ko multicast_ip=<mc_ip> multicast_port=<mc_port> \
+quote_ip=<qt_ip> quote_port=<qt_port> brokerid=<broker> userid=<user> \
+passwd=<pass> contract=<cont>
 

@@ -54,19 +54,19 @@ struct client {
 };
 
 /* FIXME */
-static char *mc_ip;
-static int mc_port;
+static char *multicast_ip;
+static int multicast_port;
 static char *quote_ip;
 static int quote_port;
 static char *brokerid, *userid, *passwd, *contract;
-module_param(mc_ip,    charp, 0000);
-module_param(mc_port,    int, 0000);
-module_param(quote_ip, charp, 0000);
-module_param(quote_port, int, 0000);
-module_param(brokerid, charp, 0000);
-module_param(userid,   charp, 0000);
-module_param(passwd,   charp, 0000);
-module_param(contract, charp, 0000);
+module_param(multicast_ip, charp, 0000);
+module_param(multicast_port, int, 0000);
+module_param(quote_ip,     charp, 0000);
+module_param(quote_port,     int, 0000);
+module_param(brokerid,     charp, 0000);
+module_param(userid,       charp, 0000);
+module_param(passwd,       charp, 0000);
+module_param(contract,     charp, 0000);
 static struct client sh;
 
 /* FIXME */
@@ -617,7 +617,7 @@ loop:
 				goto loop;
 			}
 			/* FIXME */
-			c->csock->sk->sk_allocation = GFP_NOFS;
+			c->csock->sk->sk_allocation = GFP_ATOMIC;
 			set_sock_callbacks(c->csock, c);
 			/* FIXME */
 			if ((ret = quotes_connect(c->csock, quote_ip, quote_port, O_NONBLOCK))
@@ -638,9 +638,11 @@ loop:
 static int __init quotes_init(void) {
 	int ret, one = 1;
 
-	if (mc_ip == NULL || mc_port == 0 || quote_ip == NULL || quote_port == 0 ||
-		brokerid == NULL || userid == NULL || passwd == NULL || contract == NULL) {
-		printk(KERN_ERR "[%s] mc_ip, mc_port, quote_ip, quote_port, "
+	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
+		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
+		!strcmp(brokerid, "") || userid == NULL || !strcmp(userid, "") || passwd == NULL ||
+		!strcmp(passwd, "") || contract == NULL || !strcmp(contract, "")) {
+		printk(KERN_ERR "[%s] multicast_ip, multicast_port, quote_ip, quote_port, "
 			"brokerid, userid, passwd or contract can't be NULL", __func__);
 		return -EINVAL;
 	}
@@ -648,7 +650,7 @@ static int __init quotes_init(void) {
 		printk(KERN_ERR "[%s] error creating multicast socket", __func__);
 		return -EIO;
 	}
-	if (quotes_connect(sh.msock, mc_ip, mc_port, 0) < 0) {
+	if (quotes_connect(sh.msock, multicast_ip, multicast_port, 0) < 0) {
 		printk(KERN_ERR "[%s] error connecting multicast address", __func__);
 		goto end;
 	}
@@ -657,7 +659,7 @@ static int __init quotes_init(void) {
 		goto end;
 	}
 	/* FIXME */
-	sh.csock->sk->sk_allocation = GFP_NOFS;
+	sh.csock->sk->sk_allocation = GFP_ATOMIC;
 	set_sock_callbacks(sh.csock, &sh);
 	/* FIXME */
 	if ((ret = quotes_connect(sh.csock, quote_ip, quote_port, O_NONBLOCK)) == -EINPROGRESS) {
