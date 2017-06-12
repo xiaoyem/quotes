@@ -1,5 +1,5 @@
 obj-m    += src/quotes.o
-ccflags-y = -I$(PWD)/include
+ccflags-y = -I$(PWD)/include -O2
 CC        = gcc
 CPPFLAGS  = -I./include/
 TEST-RCV  = test/test-recver

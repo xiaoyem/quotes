@@ -178,9 +178,9 @@ static void login(struct client *c) {
 	time_to_tm(time.tv_sec, 0, &tm);
 	snprintf(lo.td_day, sizeof lo.td_day, "%04ld%02d%02d",
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-	memcpy(lo.brokerid, brokerid, sizeof lo.brokerid - 1);
-	memcpy(lo.userid,   userid,   sizeof lo.userid   - 1);
-	memcpy(lo.passwd,   passwd,   sizeof lo.passwd   - 1);
+	strncat(lo.brokerid, brokerid, sizeof lo.brokerid - 1);
+	strncat(lo.userid,   userid,   sizeof lo.userid   - 1);
+	strncat(lo.passwd,   passwd,   sizeof lo.passwd   - 1);
 	/* FIXME */
 	lo.ipi[0]                  = 'T';
 	lo.ipi[1]                  = 'H';
@@ -234,7 +234,7 @@ static void subscribe(struct client *c) {
 	sb.header.ftdc_cont_length = 0x2300;
 	sb.type                    = 0x4124;
 	sb.length                  = 0x1f00;
-	memcpy(sb.instid, contract, sizeof sb.instid - 1);
+	strncat(sb.instid, contract, sizeof sb.instid - 1);
 	quotes_send(c->csock, (unsigned char *)&sb, sizeof sb);
 }
 
