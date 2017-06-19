@@ -36,14 +36,16 @@
 #include <net/sock.h>
 #include <net/tcp.h>
 #include "shfe.h"
+#include "btree.h"
 
 /* FIXME */
 struct client {
+	btree_t			btree;
+	struct quote		*quote;
 	struct socket		*msock;
 	struct socket		*csock;
 	struct task_struct	*task;
 	struct timer_list	timer;
-	struct quote		quote;
 	u32			heartbeat;
 	u32			dataready;
 	u32			connected;
@@ -58,7 +60,7 @@ static char *multicast_ip;
 static int multicast_port;
 static char *quote_ip;
 static int quote_port;
-static char *brokerid, *userid, *passwd, *contract;
+static char *brokerid, *userid, *passwd, *contracts;
 module_param(multicast_ip, charp, 0000);
 module_param(multicast_port, int, 0000);
 module_param(quote_ip,     charp, 0000);
@@ -66,7 +68,7 @@ module_param(quote_port,     int, 0000);
 module_param(brokerid,     charp, 0000);
 module_param(userid,       charp, 0000);
 module_param(passwd,       charp, 0000);
-module_param(contract,     charp, 0000);
+module_param(contracts,    charp, 0000);
 static struct client sh;
 
 /* FIXME */
@@ -220,7 +222,7 @@ static void login(struct client *c) {
 }
 
 /* FIXME */
-static void subscribe(struct client *c) {
+static void subscribe(struct client *c, char *contract) {
 	struct subscribe sb;
 
 	memset(&sb, '\0', sizeof sb);
@@ -283,130 +285,206 @@ static void print_buf(unsigned char *buf, int len) {
 }
 
 /* FIXME */
-static void handle_mdpacket(struct client *c, unsigned short *type, unsigned short *length) {
+static void handle_12packet(struct client *c, struct quote *quote) {
+	btree_node_t node;
+	int i;
+
+	if ((node = btree_find(c->btree, quote->instid, &i))) {
+		c->quote = (struct quote *)btree_node_value(node, i);
+		*c->quote = *quote;
+	} else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
+		*c->quote = *quote;
+		btree_insert(c->btree, c->quote->instid, c->quote);
+	} else {
+		printk(KERN_ERR "[%s] error locating quote for '%s'", __func__, quote->instid);
+		return;
+	}
+	handle_double(&c->quote->last);
+	handle_double(&c->quote->presettle);
+	handle_double(&c->quote->preclose);
+	handle_double(&c->quote->preopenint);
+	handle_double(&c->quote->open);
+	handle_double(&c->quote->high);
+	handle_double(&c->quote->low);
+	c->quote->volume = ntohl(c->quote->volume);
+	handle_double(&c->quote->turnover);
+	handle_double(&c->quote->openint);
+	handle_double(&c->quote->close);
+	handle_double(&c->quote->settle);
+	handle_double(&c->quote->upperlimit);
+	handle_double(&c->quote->lowerlimit);
+	handle_double(&c->quote->predelta);
+	handle_double(&c->quote->delta);
+	c->quote->msec   = ntohl(c->quote->msec);
+	handle_double(&c->quote->bid1);
+	c->quote->bvol1  = ntohl(c->quote->bvol1);
+	handle_double(&c->quote->ask1);
+	c->quote->avol1  = ntohl(c->quote->avol1);
+	handle_double(&c->quote->bid2);
+	handle_double(&c->quote->ask2);
+	handle_double(&c->quote->bid3);
+	handle_double(&c->quote->ask3);
+	handle_double(&c->quote->bid4);
+	handle_double(&c->quote->ask4);
+	handle_double(&c->quote->bid5);
+	handle_double(&c->quote->ask5);
+	handle_double(&c->quote->average);
+	quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote);
+}
+
+/* FIXME */
+static void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
 	switch (*type) {
 	case 0x3124:
 		{
 			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
 
-			if (strcmp(c->quote.td_day, mdbase->td_day))
-				memcpy(c->quote.td_day, mdbase->td_day, sizeof c->quote.td_day);
-			c->quote.presettle  = mdbase->presettle;
-			handle_double(&c->quote.presettle);
-			c->quote.preclose   = mdbase->preclose;
-			handle_double(&c->quote.preclose);
-			c->quote.preopenint = mdbase->preopenint;
-			handle_double(&c->quote.preopenint);
-			c->quote.predelta   = mdbase->predelta;
-			handle_double(&c->quote.predelta);
+			if (c->quote == NULL)
+				break;
+			if (strcmp(c->quote->td_day, mdbase->td_day))
+				memcpy(c->quote->td_day, mdbase->td_day, sizeof c->quote->td_day);
+			c->quote->presettle  = mdbase->presettle;
+			handle_double(&c->quote->presettle);
+			c->quote->preclose   = mdbase->preclose;
+			handle_double(&c->quote->preclose);
+			c->quote->preopenint = mdbase->preopenint;
+			handle_double(&c->quote->preopenint);
+			c->quote->predelta   = mdbase->predelta;
+			handle_double(&c->quote->predelta);
 		}
 		break;
 	case 0x3224:
 		{
 			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
 
-			c->quote.open       = mdstatic->open;
-			handle_double(&c->quote.open);
-			c->quote.high       = mdstatic->high;
-			handle_double(&c->quote.high);
-			c->quote.low        = mdstatic->low;
-			handle_double(&c->quote.low);
-			c->quote.close      = mdstatic->close;
-			handle_double(&c->quote.close);
-			c->quote.upperlimit = mdstatic->upperlimit;
-			handle_double(&c->quote.upperlimit);
-			c->quote.lowerlimit = mdstatic->lowerlimit;
-			handle_double(&c->quote.lowerlimit);
-			c->quote.settle     = mdstatic->settle;
-			handle_double(&c->quote.settle);
-			c->quote.delta      = mdstatic->delta;
-			handle_double(&c->quote.delta);
+			if (c->quote == NULL)
+				break;
+			c->quote->open       = mdstatic->open;
+			handle_double(&c->quote->open);
+			c->quote->high       = mdstatic->high;
+			handle_double(&c->quote->high);
+			c->quote->low        = mdstatic->low;
+			handle_double(&c->quote->low);
+			c->quote->close      = mdstatic->close;
+			handle_double(&c->quote->close);
+			c->quote->upperlimit = mdstatic->upperlimit;
+			handle_double(&c->quote->upperlimit);
+			c->quote->lowerlimit = mdstatic->lowerlimit;
+			handle_double(&c->quote->lowerlimit);
+			c->quote->settle     = mdstatic->settle;
+			handle_double(&c->quote->settle);
+			c->quote->delta      = mdstatic->delta;
+			handle_double(&c->quote->delta);
 		}
 		break;
 	case 0x3324:
 		{
 			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
 
-			c->quote.last       = mdlast->last;
-			handle_double(&c->quote.last);
-			c->quote.volume     = ntohl(mdlast->volume);
-			c->quote.turnover   = mdlast->turnover;
-			handle_double(&c->quote.turnover);
-			c->quote.openint    = mdlast->openint;
-			handle_double(&c->quote.openint);
+			if (c->quote == NULL)
+				break;
+			c->quote->last       = mdlast->last;
+			handle_double(&c->quote->last);
+			c->quote->volume     = ntohl(mdlast->volume);
+			c->quote->turnover   = mdlast->turnover;
+			handle_double(&c->quote->turnover);
+			c->quote->openint    = mdlast->openint;
+			handle_double(&c->quote->openint);
 		}
 		break;
 	case 0x3424:
 		{
 			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
 
-			c->quote.bid1       = mdbest->bid1;
-			handle_double(&c->quote.bid1);
-			c->quote.bvol1      = ntohl(mdbest->bvol1);
-			c->quote.ask1       = mdbest->ask1;
-			handle_double(&c->quote.ask1);
-			c->quote.avol1      = ntohl(mdbest->avol1);
+			if (c->quote == NULL)
+				break;
+			c->quote->bid1       = mdbest->bid1;
+			handle_double(&c->quote->bid1);
+			c->quote->bvol1      = ntohl(mdbest->bvol1);
+			c->quote->ask1       = mdbest->ask1;
+			handle_double(&c->quote->ask1);
+			c->quote->avol1      = ntohl(mdbest->avol1);
 		}
 		break;
 	case 0x3524:
 		{
 			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
 
-			c->quote.bid2       = mdbid23->bid2;
-			handle_double(&c->quote.bid2);
-			c->quote.bid3       = mdbid23->bid3;
-			handle_double(&c->quote.bid3);
+			if (c->quote == NULL)
+				break;
+			c->quote->bid2       = mdbid23->bid2;
+			handle_double(&c->quote->bid2);
+			c->quote->bid3       = mdbid23->bid3;
+			handle_double(&c->quote->bid3);
 		}
 		break;
 	case 0x3624:
 		{
 			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
 
-			c->quote.ask2       = mdask23->ask2;
-			handle_double(&c->quote.ask2);
-			c->quote.ask3       = mdask23->ask3;
-			handle_double(&c->quote.ask3);
+			if (c->quote == NULL)
+				break;
+			c->quote->ask2       = mdask23->ask2;
+			handle_double(&c->quote->ask2);
+			c->quote->ask3       = mdask23->ask3;
+			handle_double(&c->quote->ask3);
 		}
 		break;
 	case 0x3724:
 		{
 			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
 
-			c->quote.bid4       = mdbid45->bid4;
-			handle_double(&c->quote.bid4);
-			c->quote.bid5       = mdbid45->bid5;
-			handle_double(&c->quote.bid5);
+			if (c->quote == NULL)
+				break;
+			c->quote->bid4       = mdbid45->bid4;
+			handle_double(&c->quote->bid4);
+			c->quote->bid5       = mdbid45->bid5;
+			handle_double(&c->quote->bid5);
 		}
 		break;
 	case 0x3824:
 		{
 			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
 
-			c->quote.ask4       = mdask45->ask4;
-			handle_double(&c->quote.ask4);
-			c->quote.ask5       = mdask45->ask5;
-			handle_double(&c->quote.ask5);
+			if (c->quote == NULL)
+				break;
+			c->quote->ask4       = mdask45->ask4;
+			handle_double(&c->quote->ask4);
+			c->quote->ask5       = mdask45->ask5;
+			handle_double(&c->quote->ask5);
 		}
 		break;
 	case 0x3924:
 		{
 			struct mdtime *mdtime = (struct mdtime *)((unsigned char *)type + 4);
+			btree_node_t node;
+			int i;
 
-			if (strcmp(c->quote.instid, mdtime->instid))
-				memcpy(c->quote.instid, mdtime->instid, sizeof c->quote.instid);
-			if (strcmp(c->quote.time, mdtime->time))
-				memcpy(c->quote.time, mdtime->time, sizeof c->quote.time);
-			c->quote.msec       = ntohl(mdtime->msec);
-			if (strcmp(c->quote.at_day, mdtime->at_day))
-				memcpy(c->quote.at_day, mdtime->at_day, sizeof c->quote.at_day);
+			if ((node = btree_find(c->btree, mdtime->instid, &i)))
+				c->quote = (struct quote *)btree_node_value(node, i);
+			else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
+				memcpy(c->quote->instid, mdtime->instid, sizeof c->quote->instid);
+				btree_insert(c->btree, c->quote->instid, c->quote);
+			} else {
+				printk(KERN_ERR "[%s] error locating quote for '%s'",
+					__func__, mdtime->instid);
+				break;
+			}
+			if (strcmp(c->quote->time, mdtime->time))
+				memcpy(c->quote->time, mdtime->time, sizeof c->quote->time);
+			c->quote->msec       = ntohl(mdtime->msec);
+			if (strcmp(c->quote->at_day, mdtime->at_day))
+				memcpy(c->quote->at_day, mdtime->at_day, sizeof c->quote->at_day);
 		}
 		break;
 	case 0x8124:
 		{
 			double *average = (double *)((unsigned char *)type + 4);
 
-			c->quote.average    = *average;
-			handle_double(&c->quote.average);
+			if (c->quote == NULL)
+				break;
+			c->quote->average    = *average;
+			handle_double(&c->quote->average);
 		}
 		break;
 	default:
@@ -455,8 +533,18 @@ static void process_inbuf(struct client *c) {
 				{
 					struct info *info = (struct info *)(sh->buf + 4);
 
-					if (info->errid == 0)
-						subscribe(c);
+					if (info->errid == 0) {
+						int i, len = strlen(contracts), start = 0;
+
+						for (i = 0; i < len; ++i)
+							if (contracts[i] == ',') {
+								contracts[i] = '\0';
+								subscribe(c, contracts + start);
+								contracts[i] = ',';
+								start = i + 1;
+							}
+						subscribe(c, contracts + start);
+					}
 				}
 				break;
 			case 0x02440000:
@@ -475,41 +563,8 @@ static void process_inbuf(struct client *c) {
 					unsigned short *length = (unsigned short *)(sh->buf + 2);
 					struct quote *quote    = (struct quote *)(sh->buf + 4);
 
-					if (*type == 0x1200 && *length == 0x6201) {
-						c->quote = *quote;
-						handle_double(&c->quote.last);
-						handle_double(&c->quote.presettle);
-						handle_double(&c->quote.preclose);
-						handle_double(&c->quote.preopenint);
-						handle_double(&c->quote.open);
-						handle_double(&c->quote.high);
-						handle_double(&c->quote.low);
-						c->quote.volume = ntohl(c->quote.volume);
-						handle_double(&c->quote.turnover);
-						handle_double(&c->quote.openint);
-						handle_double(&c->quote.close);
-						handle_double(&c->quote.settle);
-						handle_double(&c->quote.upperlimit);
-						handle_double(&c->quote.lowerlimit);
-						handle_double(&c->quote.predelta);
-						handle_double(&c->quote.delta);
-						c->quote.msec   = ntohl(c->quote.msec);
-						handle_double(&c->quote.bid1);
-						c->quote.bvol1  = ntohl(c->quote.bvol1);
-						handle_double(&c->quote.ask1);
-						c->quote.avol1  = ntohl(c->quote.avol1);
-						handle_double(&c->quote.bid2);
-						handle_double(&c->quote.ask2);
-						handle_double(&c->quote.bid3);
-						handle_double(&c->quote.ask3);
-						handle_double(&c->quote.bid4);
-						handle_double(&c->quote.ask4);
-						handle_double(&c->quote.bid5);
-						handle_double(&c->quote.ask5);
-						handle_double(&c->quote.average);
-						quotes_send(c->msock, (unsigned char *)&c->quote,
-							sizeof c->quote);
-					}
+					if (*type == 0x1200 && *length == 0x6201)
+						handle_12packet(c, quote);
 				}
 				break;
 			case 0x03f10000:
@@ -519,15 +574,15 @@ static void process_inbuf(struct client *c) {
 					unsigned short *length = (unsigned short *)(sh->buf + 2);
 
 					for (i = 0; i < count; ++i) {
-						handle_mdpacket(c, type, length);
+						handle_24packet(c, type, length);
 						type   = (unsigned short *)((unsigned char *)type +
 							4 + ntohs(*length));
 						length = (unsigned short *)((unsigned char *)type +
 							2);
 					}
-					if (count > 0)
-						quotes_send(c->msock, (unsigned char *)&c->quote,
-							sizeof c->quote);
+					if (count > 0 && c->quote)
+						quotes_send(c->msock, (unsigned char *)c->quote,
+							sizeof *c->quote);
 				}
 				break;
 			default:
@@ -557,6 +612,13 @@ static void timer_func(unsigned long data) {
 	c->timer.function = timer_func;
 	c->timer.data     = (unsigned long)c;
 	add_timer(&c->timer);
+}
+
+/* FIXME */
+static void quote_free(void *value) {
+	struct quote *quote = (struct quote *)value;
+
+	kfree(quote);
 }
 
 /* FIXME */
@@ -641,11 +703,12 @@ static int __init quotes_init(void) {
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
 		!strcmp(brokerid, "") || userid == NULL || !strcmp(userid, "") || passwd == NULL ||
-		!strcmp(passwd, "") || contract == NULL || !strcmp(contract, "")) {
+		!strcmp(passwd, "") || contracts == NULL || !strcmp(contracts, "")) {
 		printk(KERN_ERR "[%s] multicast_ip, multicast_port, quote_ip, quote_port, "
-			"brokerid, userid, passwd or contract can't be NULL", __func__);
+			"brokerid, userid, passwd or contracts can't be NULL", __func__);
 		return -EINVAL;
 	}
+	sh.btree = btree_new(256, NULL, NULL, quote_free);
 	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sh.msock) < 0) {
 		printk(KERN_ERR "[%s] error creating multicast socket", __func__);
 		return -EIO;
@@ -692,6 +755,7 @@ static void __exit quotes_exit(void) {
 	kthread_stop(sh.task);
 	sock_release(sh.csock);
 	sock_release(sh.msock);
+	btree_free(&sh.btree);
 }
 
 module_init(quotes_init);

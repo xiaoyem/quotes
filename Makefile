@@ -1,8 +1,9 @@
-obj-m    += src/quotes.o
-ccflags-y = -I$(PWD)/include -O2
-CC        = gcc
-CPPFLAGS  = -I./include/
-TEST-RCV  = test/test-recver
+obj-m       += quotes.o
+quotes-objs := src/btree.o src/quotes.o
+ccflags-y    = -I$(PWD)/include -O2
+CC           = gcc
+CPPFLAGS     = -I./include/
+TEST-RCV     = test-recver
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
