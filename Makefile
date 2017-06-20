@@ -1,13 +1,14 @@
 obj-m       += quotes.o
 quotes-objs := src/btree.o src/quotes.o
-ccflags-y    = -I$(PWD)/include -O2
+ccflags-y    = -I$(PWD)/include -O3
 CC           = gcc
-CPPFLAGS     = -I./include/
+CPPFLAGS     = -I./include/ -O3
 TEST-RCV     = test-recver
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	$(CC) $(CPPFLAGS) -O2 test/test-recver.c -o $(TEST-RCV)
+	strip --strip-unneeded quotes.ko
+	$(CC) $(CPPFLAGS) test/test-recver.c -o $(TEST-RCV)
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean

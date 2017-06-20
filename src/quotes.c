@@ -335,12 +335,49 @@ static void handle_12packet(struct client *c, struct quote *quote) {
 /* FIXME */
 static void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
 	switch (*type) {
+	case 0x3924:
+		{
+			struct mdtime *mdtime = (struct mdtime *)((unsigned char *)type + 4);
+			btree_node_t node;
+			int i;
+
+			if ((node = btree_find(c->btree, mdtime->instid, &i)))
+				c->quote = (struct quote *)btree_node_value(node, i);
+			else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
+				memcpy(c->quote->instid, mdtime->instid, sizeof c->quote->instid);
+				btree_insert(c->btree, c->quote->instid, c->quote);
+			} else {
+				printk(KERN_ERR "[%s] error locating quote for '%s'",
+					__func__, mdtime->instid);
+				return;
+			}
+			if (strcmp(c->quote->time, mdtime->time))
+				memcpy(c->quote->time, mdtime->time, sizeof c->quote->time);
+			c->quote->msec       = ntohl(mdtime->msec);
+			if (strcmp(c->quote->at_day, mdtime->at_day))
+				memcpy(c->quote->at_day, mdtime->at_day, sizeof c->quote->at_day);
+		}
+		break;
+	case 0x3424:
+		{
+			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
+
+			if (c->quote == NULL)
+				return;
+			c->quote->bid1       = mdbest->bid1;
+			handle_double(&c->quote->bid1);
+			c->quote->bvol1      = ntohl(mdbest->bvol1);
+			c->quote->ask1       = mdbest->ask1;
+			handle_double(&c->quote->ask1);
+			c->quote->avol1      = ntohl(mdbest->avol1);
+		}
+		break;
 	case 0x3124:
 		{
 			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			if (strcmp(c->quote->td_day, mdbase->td_day))
 				memcpy(c->quote->td_day, mdbase->td_day, sizeof c->quote->td_day);
 			c->quote->presettle  = mdbase->presettle;
@@ -358,7 +395,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->open       = mdstatic->open;
 			handle_double(&c->quote->open);
 			c->quote->high       = mdstatic->high;
@@ -382,7 +419,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->last       = mdlast->last;
 			handle_double(&c->quote->last);
 			c->quote->volume     = ntohl(mdlast->volume);
@@ -392,26 +429,12 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			handle_double(&c->quote->openint);
 		}
 		break;
-	case 0x3424:
-		{
-			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
-
-			if (c->quote == NULL)
-				break;
-			c->quote->bid1       = mdbest->bid1;
-			handle_double(&c->quote->bid1);
-			c->quote->bvol1      = ntohl(mdbest->bvol1);
-			c->quote->ask1       = mdbest->ask1;
-			handle_double(&c->quote->ask1);
-			c->quote->avol1      = ntohl(mdbest->avol1);
-		}
-		break;
 	case 0x3524:
 		{
 			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->bid2       = mdbid23->bid2;
 			handle_double(&c->quote->bid2);
 			c->quote->bid3       = mdbid23->bid3;
@@ -423,7 +446,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->ask2       = mdask23->ask2;
 			handle_double(&c->quote->ask2);
 			c->quote->ask3       = mdask23->ask3;
@@ -435,7 +458,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->bid4       = mdbid45->bid4;
 			handle_double(&c->quote->bid4);
 			c->quote->bid5       = mdbid45->bid5;
@@ -447,34 +470,11 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->ask4       = mdask45->ask4;
 			handle_double(&c->quote->ask4);
 			c->quote->ask5       = mdask45->ask5;
 			handle_double(&c->quote->ask5);
-		}
-		break;
-	case 0x3924:
-		{
-			struct mdtime *mdtime = (struct mdtime *)((unsigned char *)type + 4);
-			btree_node_t node;
-			int i;
-
-			if ((node = btree_find(c->btree, mdtime->instid, &i)))
-				c->quote = (struct quote *)btree_node_value(node, i);
-			else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
-				memcpy(c->quote->instid, mdtime->instid, sizeof c->quote->instid);
-				btree_insert(c->btree, c->quote->instid, c->quote);
-			} else {
-				printk(KERN_ERR "[%s] error locating quote for '%s'",
-					__func__, mdtime->instid);
-				break;
-			}
-			if (strcmp(c->quote->time, mdtime->time))
-				memcpy(c->quote->time, mdtime->time, sizeof c->quote->time);
-			c->quote->msec       = ntohl(mdtime->msec);
-			if (strcmp(c->quote->at_day, mdtime->at_day))
-				memcpy(c->quote->at_day, mdtime->at_day, sizeof c->quote->at_day);
 		}
 		break;
 	case 0x8124:
@@ -482,7 +482,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			double *average = (double *)((unsigned char *)type + 4);
 
 			if (c->quote == NULL)
-				break;
+				return;
 			c->quote->average    = *average;
 			handle_double(&c->quote->average);
 		}
@@ -534,16 +534,16 @@ static void process_inbuf(struct client *c) {
 					struct info *info = (struct info *)(sh->buf + 4);
 
 					if (info->errid == 0) {
-						int i, len = strlen(contracts), start = 0;
+						int len = strlen(contracts);
 
-						for (i = 0; i < len; ++i)
+						for (i = 0, j = 0; i < len; ++i)
 							if (contracts[i] == ',') {
 								contracts[i] = '\0';
-								subscribe(c, contracts + start);
+								subscribe(c, contracts + j);
 								contracts[i] = ',';
-								start = i + 1;
+								j = i + 1;
 							}
-						subscribe(c, contracts + start);
+						subscribe(c, contracts + j);
 					}
 				}
 				break;
