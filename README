@@ -1,8 +1,10 @@
 
 Kernel module for futures quotes
 
-echo 3 >/proc/sys/net/ipv4/tcp_syn_retries
-insmod quotes.ko multicast_ip=<mc_ip> multicast_port=<mc_port> \
+1) yum -y install kernel-devel
+2) make
+3) echo 3 >/proc/sys/net/ipv4/tcp_syn_retries
+4) insmod quotes.ko multicast_ip=<mc_ip> multicast_port=<mc_port> \
 quote_ip=<qt_ip> quote_port=<qt_port> brokerid=<broker> userid=<user> \
 passwd=<pass> contracts=<cont1,cont2,cont3...>
 
