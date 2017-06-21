@@ -732,7 +732,7 @@ loop:
 }
 
 static int __init quotes_init(void) {
-	int ret, one = 1;
+	int ret, val = 1024 * 1024, one = 1;
 
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
@@ -754,6 +754,8 @@ static int __init quotes_init(void) {
 		printk(KERN_ERR "[%s] error connecting multicast address\n", __func__);
 		goto end;
 	}
+	/* FIXME */
+	kernel_setsockopt(sh.msock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &sh.csock) < 0) {
 		printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 		goto end;

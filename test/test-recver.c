@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -66,6 +67,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "fcntl(F_SETFL,O_NONBLOCK): %s", strerror(errno));
 		return -1;
 	}
+	/* setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &val, sizeof val); */
 	memset(&sa, '\0', sizeof sa);
 	sa.sin_family      = AF_INET;
 	sa.sin_port        = htons(atoi(argv[2]));

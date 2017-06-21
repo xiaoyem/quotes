@@ -1,8 +1,8 @@
 obj-m       += quotes.o
 quotes-objs := src/btree.o src/quotes.o
-ccflags-y    = -I$(PWD)/include -O3
+ccflags-y    = -I$(PWD)/include -Wall -O3
 CC           = gcc
-CPPFLAGS     = -I./include/ -O3
+CPPFLAGS     = -I./include/ -Wall -O3
 TEST-RCV     = test-recver
 
 all:
