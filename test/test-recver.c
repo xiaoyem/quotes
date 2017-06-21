@@ -30,6 +30,8 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,14 +47,23 @@ static void usage(void) {
 }
 
 int main(int argc, char **argv) {
-	int sock;
+	int sock, flags;
 	struct sockaddr_in sa;
 	struct ip_mreq imr;
+	struct pollfd rfd[1];
 
 	if (argc != 3)
 		usage();
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		fprintf(stderr, "creating socket: %s", strerror(errno));
+		return -1;
+	}
+	if ((flags = fcntl(sock, F_GETFL)) == -1) {
+		fprintf(stderr, "fcntl(F_GETFL): %s", strerror(errno));
+		return -1;
+	}
+	if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+		fprintf(stderr, "fcntl(F_SETFL,O_NONBLOCK): %s", strerror(errno));
 		return -1;
 	}
 	memset(&sa, '\0', sizeof sa);
@@ -71,11 +82,17 @@ int main(int argc, char **argv) {
 		close(sock);
 		return -1;
 	}
+	rfd[0].fd     = sock;
+	rfd[0].events = POLLIN;
 	while (1) {
+		struct timespec timeout = {0, 5};
 		struct quote quote;
 		socklen_t slen = sizeof sa;
 
-		if (recvfrom(sock, &quote, sizeof quote, 0, (struct sockaddr *)&sa, &slen) > 0)
+		/* FIXME */
+		ppoll(rfd, 1, &timeout, NULL);
+		if (rfd[0].revents & POLLIN &&
+			recvfrom(sock, &quote, sizeof quote, 0, (struct sockaddr *)&sa, &slen) > 0)
 			fprintf(stdout, "%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,"
 				"%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
 				"%f,%d,%f,%s\n",

@@ -117,7 +117,7 @@ static void print_buf(unsigned char *buf, int len) {
 	int i;
 
 	for (i = 0; i + 7 < len; i += 8)
-		printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
+		printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x\n",
 			__func__, len,
 			buf[i],
 			buf[i + 1],
@@ -128,7 +128,7 @@ static void print_buf(unsigned char *buf, int len) {
 			buf[i + 6],
 			buf[i + 7]);
 	for (; i < len; ++i)
-		printk(KERN_INFO "[%s] <%d> %02x ", __func__, len, buf[i]);
+		printk(KERN_INFO "[%s] <%d> %02x\n", __func__, len, buf[i]);
 }
 
 /* FIXME */
@@ -142,7 +142,7 @@ static void send_hbtimeout(struct client *c) {
 	to.tag_length      = 0x04;
 	to.timeout         = 0x27000000;
 	if (quotes_send(c->csock, (unsigned char *)&to, sizeof to) < 0)
-		printk(KERN_ERR "[%s] send failed", __func__);
+		printk(KERN_ERR "[%s] send failed\n", __func__);
 }
 
 /* FIXME */
@@ -155,7 +155,7 @@ static void send_heartbeat(struct client *c) {
 	hb.tag_type        = 0x05;
 	hb.tag_length      = 0x00;
 	if (quotes_send(c->csock, (unsigned char *)&hb, sizeof hb) < 0)
-		printk(KERN_ERR "[%s] send failed", __func__);
+		printk(KERN_ERR "[%s] send failed\n", __func__);
 }
 
 static void login(struct client *c) {
@@ -220,7 +220,7 @@ static void login(struct client *c) {
 	lo.length4                 = 0x0600;
 	lo.seq_series4             = 0x0400;
 	if (quotes_send(c->csock, (unsigned char *)&lo, sizeof lo) < 0)
-		printk(KERN_ERR "[%s] send failed", __func__);
+		printk(KERN_ERR "[%s] send failed\n", __func__);
 }
 
 /* FIXME */
@@ -240,7 +240,7 @@ static void subscribe(struct client *c, const char *contract) {
 	sb.length                  = 0x1f00;
 	strncat(sb.instid, contract, sizeof sb.instid - 1);
 	if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
-		printk(KERN_ERR "[%s] send failed", __func__);
+		printk(KERN_ERR "[%s] send failed\n", __func__);
 }
 
 /* FIXME */
@@ -255,7 +255,7 @@ static void handle_12packet(struct client *c, struct quote *quote) {
 		*c->quote = *quote;
 		btree_insert(c->btree, c->quote->instid, c->quote);
 	} else {
-		printk(KERN_ERR "[%s] error locating quote for '%s'", __func__, quote->instid);
+		printk(KERN_ERR "[%s] error locating quote for '%s'\n", __func__, quote->instid);
 		return;
 	}
 	handle_double(&c->quote->last);
@@ -289,7 +289,7 @@ static void handle_12packet(struct client *c, struct quote *quote) {
 	handle_double(&c->quote->ask5);
 	handle_double(&c->quote->average);
 	if (quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote) < 0)
-		printk(KERN_ERR "[%s] send quote failed", __func__);
+		printk(KERN_ERR "[%s] send quote failed\n", __func__);
 }
 
 static void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
@@ -306,7 +306,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 				memcpy(c->quote->instid, mdtime->instid, sizeof c->quote->instid);
 				btree_insert(c->btree, c->quote->instid, c->quote);
 			} else {
-				printk(KERN_ERR "[%s] error locating quote for '%s'",
+				printk(KERN_ERR "[%s] error locating quote for '%s'\n",
 					__func__, mdtime->instid);
 				return;
 			}
@@ -322,7 +322,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			c->quote->bid1       = mdbest->bid1;
@@ -338,7 +338,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			if (strcmp(c->quote->td_day, mdbase->td_day))
@@ -358,7 +358,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			c->quote->open       = mdstatic->open;
@@ -384,7 +384,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			c->quote->last       = mdlast->last;
@@ -401,7 +401,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			/* FIXME */
@@ -416,7 +416,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			/* FIXME */
@@ -431,7 +431,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			/* FIXME */
@@ -446,7 +446,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			/* FIXME */
@@ -461,7 +461,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 			double *average = (double *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
-				printk(KERN_ERR "[%s] unrecoverable error", __func__);
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			c->quote->average    = *average;
@@ -478,30 +478,30 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 static void quotes_sock_data_ready(struct sock *sk, int unused) {
 	struct client *c = (struct client *)sk->sk_user_data;
 
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d\n", __func__, sk->sk_state);
 	if (sk->sk_state != TCP_CLOSE && sk->sk_state != TCP_CLOSE_WAIT)
 		atomic_inc((atomic_t *)&c->dataready);
 }
 
 /* FIXME */
 static void quotes_sock_write_space(struct sock *sk) {
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d\n", __func__, sk->sk_state);
 }
 
 /* FIXME */
 static void quotes_sock_state_change(struct sock *sk) {
 	struct client *c = (struct client *)sk->sk_user_data;
 
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+	printk(KERN_INFO "[%s] state = %d\n", __func__, sk->sk_state);
 	switch (sk->sk_state) {
 	case TCP_CLOSE:
-		printk(KERN_INFO "[%s] TCP_CLOSE", __func__);
+		printk(KERN_INFO "[%s] TCP_CLOSE\n", __func__);
 	case TCP_CLOSE_WAIT:
-		printk(KERN_INFO "[%s] TCP_CLOSE_WAIT", __func__);
+		printk(KERN_INFO "[%s] TCP_CLOSE_WAIT\n", __func__);
 		atomic_set((atomic_t *)&c->disconnected, 1);
 		break;
 	case TCP_ESTABLISHED:
-		printk(KERN_INFO "[%s] TCP_ESTABLISHED", __func__);
+		printk(KERN_INFO "[%s] TCP_ESTABLISHED\n", __func__);
 		atomic_set((atomic_t *)&c->connected, 1);
 		break;
 	default:
@@ -571,7 +571,7 @@ static void process_inbuf(struct client *c) {
 					char *contract = (char *)(sh->buf + 4 + sizeof *info + 4);
 
 					if (info->errid != 0)
-						printk(KERN_INFO "[%s] subscribe '%s' failed",
+						printk(KERN_INFO "[%s] subscribe '%s' failed\n",
 							__func__, contract);
 				}
 				break;
@@ -600,7 +600,8 @@ static void process_inbuf(struct client *c) {
 					}
 					if (count > 0 && c->quote && quotes_send(c->msock,
 						(unsigned char *)c->quote, sizeof *c->quote) < 0)
-						printk(KERN_ERR "[%s] send quote failed", __func__);
+						printk(KERN_ERR "[%s] send quote failed\n",
+							__func__);
 				}
 				break;
 			default:
@@ -608,10 +609,10 @@ static void process_inbuf(struct client *c) {
 				break;
 			}
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
-			printk(KERN_INFO "[%s] receiving heartbeat", __func__);
+			printk(KERN_INFO "[%s] receiving heartbeat\n", __func__);
 			ftd_cont_len = ftd_extd_len;
 		} else
-			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d",
+			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d\n",
 				__func__, ftd_type, ftd_cont_len);
 		start    += ftd_cont_len + 4;
 		c->inpos -= ftd_cont_len + 4;
@@ -665,7 +666,7 @@ static int quotes_thread(void *data) {
 
 	while (!kthread_should_stop()) {
 		if (atomic_read((atomic_t *)&c->heartbeat)) {
-			printk(KERN_INFO "[%s] sending heartbeat", __func__);
+			printk(KERN_INFO "[%s] sending heartbeat\n", __func__);
 			send_heartbeat(c);
 			atomic_set((atomic_t *)&c->heartbeat, 0);
 		}
@@ -677,7 +678,7 @@ static int quotes_thread(void *data) {
 				c->inpos += len;
 				/* FIXME */
 				if (c->inpos > sizeof c->inbuf) {
-					printk(KERN_ERR "[%s] max input buffer length reached",
+					printk(KERN_ERR "[%s] max input buffer length reached\n",
 						__func__);
 					c->inpos = 0;
 				} else
@@ -691,9 +692,9 @@ static int quotes_thread(void *data) {
 			c->timer.function = timer_func;
 			c->timer.data     = (unsigned long)c;
 			add_timer(&c->timer);
-			printk(KERN_INFO "[%s] sending heartbeat timeout", __func__);
+			printk(KERN_INFO "[%s] sending heartbeat timeout\n", __func__);
 			send_hbtimeout(c);
-			printk(KERN_INFO "[%s] logging in", __func__);
+			printk(KERN_INFO "[%s] logging in\n", __func__);
 			login(c);
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
@@ -708,7 +709,7 @@ loop:
 			/* FIXME */
 			schedule_timeout_uninterruptible(15 * HZ);
 			if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &c->csock) < 0) {
-				printk(KERN_ERR "[%s] error creating client socket", __func__);
+				printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 				goto loop;
 			}
 			/* FIXME */
@@ -718,7 +719,7 @@ loop:
 			if ((ret = quotes_connect(c->csock, quote_ip, quote_port, O_NONBLOCK))
 				== -EINPROGRESS) {
 			} else if (ret < 0) {
-				printk(KERN_ERR "[%s] error reconnecting quote address", __func__);
+				printk(KERN_ERR "[%s] error reconnecting quote address\n", __func__);
 				sock_release(c->csock);
 				goto loop;
 			}
@@ -738,23 +739,23 @@ static int __init quotes_init(void) {
 		!strcmp(brokerid, "") || userid == NULL || !strcmp(userid, "") || passwd == NULL ||
 		!strcmp(passwd, "") || contracts == NULL || !strcmp(contracts, "")) {
 		printk(KERN_ERR "[%s] multicast_ip, multicast_port, quote_ip, quote_port, "
-			"brokerid, userid, passwd or contracts can't be NULL", __func__);
+			"brokerid, userid, passwd or contracts can't be NULL\n", __func__);
 		return -EINVAL;
 	}
 	if ((sh.btree = btree_new(256, NULL, NULL, quote_free)) == NULL) {
-		printk(KERN_ERR "[%s] error allocating quote cache", __func__);
+		printk(KERN_ERR "[%s] error allocating quote cache\n", __func__);
 		return -ENOMEM;
 	}
 	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sh.msock) < 0) {
-		printk(KERN_ERR "[%s] error creating multicast socket", __func__);
+		printk(KERN_ERR "[%s] error creating multicast socket\n", __func__);
 		return -EIO;
 	}
 	if (quotes_connect(sh.msock, multicast_ip, multicast_port, 0) < 0) {
-		printk(KERN_ERR "[%s] error connecting multicast address", __func__);
+		printk(KERN_ERR "[%s] error connecting multicast address\n", __func__);
 		goto end;
 	}
 	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &sh.csock) < 0) {
-		printk(KERN_ERR "[%s] error creating client socket", __func__);
+		printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 		goto end;
 	}
 	/* FIXME */
@@ -763,7 +764,7 @@ static int __init quotes_init(void) {
 	/* FIXME */
 	if ((ret = quotes_connect(sh.csock, quote_ip, quote_port, O_NONBLOCK)) == -EINPROGRESS) {
 	} else if (ret < 0) {
-		printk(KERN_ERR "[%s] error connecting quote address", __func__);
+		printk(KERN_ERR "[%s] error connecting quote address\n", __func__);
 		sock_release(sh.csock);
 		goto end;
 	}
@@ -771,7 +772,7 @@ static int __init quotes_init(void) {
 	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
 	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
-		printk(KERN_ERR "[%s] error creating quotes thread", __func__);
+		printk(KERN_ERR "[%s] error creating quotes thread\n", __func__);
 		sock_release(sh.csock);
 		goto end;
 	}
