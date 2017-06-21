@@ -88,48 +88,47 @@ static int quotes_recv(struct socket *sock, unsigned char *buf, int len) {
 }
 
 /* FIXME */
-static void quotes_sock_data_ready(struct sock *sk, int unused) {
-	struct client *c = (struct client *)sk->sk_user_data;
+static void handle_double(double *x) {
+	unsigned char *p;
 
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
-	if (sk->sk_state != TCP_CLOSE && sk->sk_state != TCP_CLOSE_WAIT)
-		atomic_inc((atomic_t *)&c->dataready);
-}
+	p = (unsigned char *)x;
+	if (p[0] == 0x7f && p[1] == 0xef && p[2] == 0xff && p[3] == 0xff &&
+		p[4] == 0xff && p[5] == 0xff && p[6] == 0xff && p[7] == 0xff)
+		p[0] = p[1] = p[2] = p[3] = p[4] = p[5] = p[6] = p[7] = 0x00;
+	else if (p[0] != 0x00 || p[1] != 0x00 || p[2] != 0x00 || p[3] != 0x00 ||
+		p[4] != 0x00 || p[5] != 0x00 || p[6] != 0x00 || p[7] != 0x00) {
+		/* courtesy of Yingzhi Zheng */
+		long l = *((long *)x), *m = &l;
 
-/* FIXME */
-static void quotes_sock_write_space(struct sock *sk) {
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
-}
-
-/* FIXME */
-static void quotes_sock_state_change(struct sock *sk) {
-	struct client *c = (struct client *)sk->sk_user_data;
-
-	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
-	switch (sk->sk_state) {
-	case TCP_CLOSE:
-		printk(KERN_INFO "[%s] TCP_CLOSE", __func__);
-	case TCP_CLOSE_WAIT:
-		printk(KERN_INFO "[%s] TCP_CLOSE_WAIT", __func__);
-		atomic_set((atomic_t *)&c->disconnected, 1);
-		break;
-	case TCP_ESTABLISHED:
-		printk(KERN_INFO "[%s] TCP_ESTABLISHED", __func__);
-		atomic_set((atomic_t *)&c->connected, 1);
-		break;
-	default:
-		break;
+		l =     ((l & 0xff00000000000000) >> 56) |
+			((l & 0x00ff000000000000) >> 40) |
+			((l & 0x0000ff0000000000) >> 24) |
+			((l & 0x000000ff00000000) >> 8 ) |
+			((l & 0x00000000ff000000) << 8 ) |
+			((l & 0x0000000000ff0000) << 24) |
+			((l & 0x000000000000ff00) << 40) |
+			((l & 0x00000000000000ff) << 56);
+		*x = *((double *)m);
 	}
 }
 
 /* FIXME */
-static void set_sock_callbacks(struct socket *sock, struct client *c) {
-	struct sock *sk = sock->sk;
+static void print_buf(unsigned char *buf, int len) {
+	int i;
 
-	sk->sk_user_data    = (void *)c;
-	sk->sk_data_ready   = quotes_sock_data_ready;
-	sk->sk_write_space  = quotes_sock_write_space;
-	sk->sk_state_change = quotes_sock_state_change;
+	for (i = 0; i + 7 < len; i += 8)
+		printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
+			__func__, len,
+			buf[i],
+			buf[i + 1],
+			buf[i + 2],
+			buf[i + 3],
+			buf[i + 4],
+			buf[i + 5],
+			buf[i + 6],
+			buf[i + 7]);
+	for (; i < len; ++i)
+		printk(KERN_INFO "[%s] <%d> %02x ", __func__, len, buf[i]);
 }
 
 /* FIXME */
@@ -142,7 +141,8 @@ static void send_hbtimeout(struct client *c) {
 	to.tag_type        = 0x07;
 	to.tag_length      = 0x04;
 	to.timeout         = 0x27000000;
-	quotes_send(c->csock, (unsigned char *)&to, sizeof to);
+	if (quotes_send(c->csock, (unsigned char *)&to, sizeof to) < 0)
+		printk(KERN_ERR "[%s] send failed", __func__);
 }
 
 /* FIXME */
@@ -154,7 +154,8 @@ static void send_heartbeat(struct client *c) {
 	hb.ftd_cont_length = 0x0000;
 	hb.tag_type        = 0x05;
 	hb.tag_length      = 0x00;
-	quotes_send(c->csock, (unsigned char *)&hb, sizeof hb);
+	if (quotes_send(c->csock, (unsigned char *)&hb, sizeof hb) < 0)
+		printk(KERN_ERR "[%s] send failed", __func__);
 }
 
 static void login(struct client *c) {
@@ -218,11 +219,12 @@ static void login(struct client *c) {
 	lo.type4                   = 0x0110;
 	lo.length4                 = 0x0600;
 	lo.seq_series4             = 0x0400;
-	quotes_send(c->csock, (unsigned char *)&lo, sizeof lo);
+	if (quotes_send(c->csock, (unsigned char *)&lo, sizeof lo) < 0)
+		printk(KERN_ERR "[%s] send failed", __func__);
 }
 
 /* FIXME */
-static void subscribe(struct client *c, char *contract) {
+static void subscribe(struct client *c, const char *contract) {
 	struct subscribe sb;
 
 	memset(&sb, '\0', sizeof sb);
@@ -237,51 +239,8 @@ static void subscribe(struct client *c, char *contract) {
 	sb.type                    = 0x4124;
 	sb.length                  = 0x1f00;
 	strncat(sb.instid, contract, sizeof sb.instid - 1);
-	quotes_send(c->csock, (unsigned char *)&sb, sizeof sb);
-}
-
-/* FIXME */
-static void handle_double(double *x) {
-	unsigned char *p;
-
-	p = (unsigned char *)x;
-	if (p[0] == 0x7f && p[1] == 0xef && p[2] == 0xff && p[3] == 0xff &&
-		p[4] == 0xff && p[5] == 0xff && p[6] == 0xff && p[7] == 0xff)
-		p[0] = p[1] = p[2] = p[3] = p[4] = p[5] = p[6] = p[7] = 0x00;
-	else if (p[0] != 0x00 || p[1] != 0x00 || p[2] != 0x00 || p[3] != 0x00 ||
-		p[4] != 0x00 || p[5] != 0x00 || p[6] != 0x00 || p[7] != 0x00) {
-		/* courtesy of Yingzhi Zheng */
-		long l = *((long *)x), *m = &l;
-
-		l =     ((l & 0xff00000000000000) >> 56) |
-			((l & 0x00ff000000000000) >> 40) |
-			((l & 0x0000ff0000000000) >> 24) |
-			((l & 0x000000ff00000000) >> 8 ) |
-			((l & 0x00000000ff000000) << 8 ) |
-			((l & 0x0000000000ff0000) << 24) |
-			((l & 0x000000000000ff00) << 40) |
-			((l & 0x00000000000000ff) << 56);
-		*x = *((double *)m);
-	}
-}
-
-/* FIXME */
-static void print_buf(unsigned char *buf, int len) {
-	int i;
-
-	for (i = 0; i + 7 < len; i += 8)
-		printk(KERN_INFO "[%s] <%d> %02x %02x %02x %02x %02x %02x %02x %02x",
-			__func__, len,
-			buf[i],
-			buf[i + 1],
-			buf[i + 2],
-			buf[i + 3],
-			buf[i + 4],
-			buf[i + 5],
-			buf[i + 6],
-			buf[i + 7]);
-	for (; i < len; ++i)
-		printk(KERN_INFO "[%s] <%d> %02x ", __func__, len, buf[i]);
+	if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
+		printk(KERN_ERR "[%s] send failed", __func__);
 }
 
 /* FIXME */
@@ -329,10 +288,10 @@ static void handle_12packet(struct client *c, struct quote *quote) {
 	handle_double(&c->quote->bid5);
 	handle_double(&c->quote->ask5);
 	handle_double(&c->quote->average);
-	quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote);
+	if (quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote) < 0)
+		printk(KERN_ERR "[%s] send quote failed", __func__);
 }
 
-/* FIXME */
 static void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
 	switch (*type) {
 	case 0x3924:
@@ -362,8 +321,10 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
 			c->quote->bid1       = mdbest->bid1;
 			handle_double(&c->quote->bid1);
 			c->quote->bvol1      = ntohl(mdbest->bvol1);
@@ -376,8 +337,10 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
 			if (strcmp(c->quote->td_day, mdbase->td_day))
 				memcpy(c->quote->td_day, mdbase->td_day, sizeof c->quote->td_day);
 			c->quote->presettle  = mdbase->presettle;
@@ -394,8 +357,10 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
 			c->quote->open       = mdstatic->open;
 			handle_double(&c->quote->open);
 			c->quote->high       = mdstatic->high;
@@ -418,8 +383,10 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
 			c->quote->last       = mdlast->last;
 			handle_double(&c->quote->last);
 			c->quote->volume     = ntohl(mdlast->volume);
@@ -433,8 +400,11 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
+			/* FIXME */
 			c->quote->bid2       = mdbid23->bid2;
 			handle_double(&c->quote->bid2);
 			c->quote->bid3       = mdbid23->bid3;
@@ -445,8 +415,11 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
+			/* FIXME */
 			c->quote->ask2       = mdask23->ask2;
 			handle_double(&c->quote->ask2);
 			c->quote->ask3       = mdask23->ask3;
@@ -457,8 +430,11 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
+			/* FIXME */
 			c->quote->bid4       = mdbid45->bid4;
 			handle_double(&c->quote->bid4);
 			c->quote->bid5       = mdbid45->bid5;
@@ -469,8 +445,11 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
+			/* FIXME */
 			c->quote->ask4       = mdask45->ask4;
 			handle_double(&c->quote->ask4);
 			c->quote->ask5       = mdask45->ask5;
@@ -481,14 +460,51 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 		{
 			double *average = (double *)((unsigned char *)type + 4);
 
-			if (c->quote == NULL)
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error", __func__);
 				return;
+			}
 			c->quote->average    = *average;
 			handle_double(&c->quote->average);
 		}
 		break;
 	default:
 		print_buf((unsigned char *)type, *length + 4);
+		break;
+	}
+}
+
+/* FIXME */
+static void quotes_sock_data_ready(struct sock *sk, int unused) {
+	struct client *c = (struct client *)sk->sk_user_data;
+
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+	if (sk->sk_state != TCP_CLOSE && sk->sk_state != TCP_CLOSE_WAIT)
+		atomic_inc((atomic_t *)&c->dataready);
+}
+
+/* FIXME */
+static void quotes_sock_write_space(struct sock *sk) {
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+}
+
+/* FIXME */
+static void quotes_sock_state_change(struct sock *sk) {
+	struct client *c = (struct client *)sk->sk_user_data;
+
+	printk(KERN_INFO "[%s] state = %d", __func__, sk->sk_state);
+	switch (sk->sk_state) {
+	case TCP_CLOSE:
+		printk(KERN_INFO "[%s] TCP_CLOSE", __func__);
+	case TCP_CLOSE_WAIT:
+		printk(KERN_INFO "[%s] TCP_CLOSE_WAIT", __func__);
+		atomic_set((atomic_t *)&c->disconnected, 1);
+		break;
+	case TCP_ESTABLISHED:
+		printk(KERN_INFO "[%s] TCP_ESTABLISHED", __func__);
+		atomic_set((atomic_t *)&c->connected, 1);
+		break;
+	default:
 		break;
 	}
 }
@@ -502,7 +518,7 @@ static void process_inbuf(struct client *c) {
 		unsigned short ftd_cont_len = ntohs(*((unsigned short *)(start + 2)));
 
 		/* packet is incomplete */
-		if (c->inpos < ftd_cont_len + 4)
+		if (unlikely(c->inpos < ftd_cont_len + 4))
 			break;
 		if (ftd_type == 0x02 && ftd_extd_len == 0x00 && ftd_cont_len > 0) {
 			int i, j;
@@ -538,9 +554,11 @@ static void process_inbuf(struct client *c) {
 
 						for (i = 0, j = 0; i < len; ++i)
 							if (contracts[i] == ',') {
-								contracts[i] = '\0';
-								subscribe(c, contracts + j);
-								contracts[i] = ',';
+								if (j < i) {
+									contracts[i] = '\0';
+									subscribe(c, contracts + j);
+									contracts[i] = ',';
+								}
 								j = i + 1;
 							}
 						subscribe(c, contracts + j);
@@ -553,7 +571,7 @@ static void process_inbuf(struct client *c) {
 					char *contract = (char *)(sh->buf + 4 + sizeof *info + 4);
 
 					if (info->errid != 0)
-						printk(KERN_INFO "[%s] subscribe '%s' NOT OK",
+						printk(KERN_INFO "[%s] subscribe '%s' failed",
 							__func__, contract);
 				}
 				break;
@@ -580,9 +598,9 @@ static void process_inbuf(struct client *c) {
 						length = (unsigned short *)((unsigned char *)type +
 							2);
 					}
-					if (count > 0 && c->quote)
-						quotes_send(c->msock, (unsigned char *)c->quote,
-							sizeof *c->quote);
+					if (count > 0 && c->quote && quotes_send(c->msock,
+						(unsigned char *)c->quote, sizeof *c->quote) < 0)
+						printk(KERN_ERR "[%s] send quote failed", __func__);
 				}
 				break;
 			default:
@@ -615,6 +633,16 @@ static void timer_func(unsigned long data) {
 }
 
 /* FIXME */
+static void set_sock_callbacks(struct socket *sock, struct client *c) {
+	struct sock *sk = sock->sk;
+
+	sk->sk_user_data    = (void *)c;
+	sk->sk_data_ready   = quotes_sock_data_ready;
+	sk->sk_write_space  = quotes_sock_write_space;
+	sk->sk_state_change = quotes_sock_state_change;
+}
+
+/* FIXME */
 static void quote_free(void *value) {
 	struct quote *quote = (struct quote *)value;
 
@@ -632,7 +660,7 @@ static int quotes_connect(struct socket *sock, const char *ip, int port, int fla
 	return sock->ops->connect(sock, (struct sockaddr *)&s, sizeof s, flags);
 }
 
-static int recv_thread(void *data) {
+static int quotes_thread(void *data) {
 	struct client *c = (struct client *)data;
 
 	while (!kthread_should_stop()) {
@@ -645,10 +673,15 @@ static int recv_thread(void *data) {
 			int len;
 
 			len = quotes_recv(c->csock, c->inbuf + c->inpos, sizeof c->inbuf - c->inpos);
-			/* FIXME */
 			if (len) {
 				c->inpos += len;
-				process_inbuf(c);
+				/* FIXME */
+				if (c->inpos > sizeof c->inbuf) {
+					printk(KERN_ERR "[%s] max input buffer length reached",
+						__func__);
+					c->inpos = 0;
+				} else
+					process_inbuf(c);
 			}
 			atomic_dec((atomic_t *)&c->dataready);
 		}
@@ -708,7 +741,10 @@ static int __init quotes_init(void) {
 			"brokerid, userid, passwd or contracts can't be NULL", __func__);
 		return -EINVAL;
 	}
-	sh.btree = btree_new(256, NULL, NULL, quote_free);
+	if ((sh.btree = btree_new(256, NULL, NULL, quote_free)) == NULL) {
+		printk(KERN_ERR "[%s] error allocating quote cache", __func__);
+		return -ENOMEM;
+	}
 	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sh.msock) < 0) {
 		printk(KERN_ERR "[%s] error creating multicast socket", __func__);
 		return -EIO;
@@ -733,7 +769,7 @@ static int __init quotes_init(void) {
 	}
 	/* FIXME */
 	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
-	sh.task = kthread_create(recv_thread, &sh, "quotes_sh");
+	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
 		printk(KERN_ERR "[%s] error creating quotes thread", __func__);
 		sock_release(sh.csock);
