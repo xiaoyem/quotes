@@ -478,7 +478,7 @@ static void handle_24packet(struct client *c, unsigned short *type, unsigned sho
 static void quotes_sock_data_ready(struct sock *sk, int unused) {
 	struct client *c = (struct client *)sk->sk_user_data;
 
-	printk(KERN_INFO "[%s] state = %d\n", __func__, sk->sk_state);
+	/* printk(KERN_INFO "[%s] state = %d\n", __func__, sk->sk_state); */
 	if (sk->sk_state != TCP_CLOSE && sk->sk_state != TCP_CLOSE_WAIT)
 		atomic_inc((atomic_t *)&c->dataready);
 }
@@ -609,7 +609,7 @@ static void process_inbuf(struct client *c) {
 				break;
 			}
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
-			printk(KERN_INFO "[%s] receiving heartbeat\n", __func__);
+			/* printk(KERN_INFO "[%s] receiving heartbeat\n", __func__); */
 			ftd_cont_len = ftd_extd_len;
 		} else
 			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d\n",
@@ -666,7 +666,7 @@ static int quotes_thread(void *data) {
 
 	while (!kthread_should_stop()) {
 		if (atomic_read((atomic_t *)&c->heartbeat)) {
-			printk(KERN_INFO "[%s] sending heartbeat\n", __func__);
+			/* printk(KERN_INFO "[%s] sending heartbeat\n", __func__); */
 			send_heartbeat(c);
 			atomic_set((atomic_t *)&c->heartbeat, 0);
 		}
