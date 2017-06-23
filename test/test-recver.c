@@ -43,7 +43,7 @@
 
 /* FIXME */
 static void usage(void) {
-	fprintf(stderr, "Usage: ./test-recver <multicast_ip> <multicast_port>\n");
+	fprintf(stderr, "Usage: ./test-recver <mc_ip> <mc_port>\n");
 	exit(1);
 }
 
