@@ -51,7 +51,7 @@ struct client {
 	u32			connected;
 	u32			disconnected;
 	u32			inpos;
-	unsigned char		inbuf[128 * 1024 * 1024];
+	unsigned char		inbuf[64 * 1024 * 1024];
 	unsigned char		debuf[8192];
 };
 
@@ -674,7 +674,7 @@ static int quotes_thread(void *data) {
 			int len;
 
 			len = quotes_recv(c->csock, c->inbuf + c->inpos, sizeof c->inbuf - c->inpos);
-			if (len) {
+			if (len > 0) {
 				c->inpos += len;
 				/* FIXME */
 				if (c->inpos > sizeof c->inbuf) {
