@@ -88,7 +88,7 @@ static int quotes_recv(struct socket *sock, unsigned char *buf, int len) {
 }
 
 /* FIXME */
-static void handle_double(double *x) {
+static inline void handle_double(double *x) {
 	unsigned char *p;
 
 	p = (unsigned char *)x;
@@ -244,7 +244,7 @@ static void subscribe(struct client *c, const char *contract) {
 }
 
 /* FIXME */
-static void handle_12packet(struct client *c, struct quote *quote) {
+static inline void handle_12packet(struct client *c, struct quote *quote) {
 	btree_node_t node;
 	int i;
 
@@ -292,7 +292,7 @@ static void handle_12packet(struct client *c, struct quote *quote) {
 		printk(KERN_ERR "[%s] send quote failed\n", __func__);
 }
 
-static void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
+static inline void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
 	switch (*type) {
 	case 0x3924:
 		{
@@ -561,7 +561,8 @@ static void process_inbuf(struct client *c) {
 								}
 								j = i + 1;
 							}
-						subscribe(c, contracts + j);
+						if (j < i)
+							subscribe(c, contracts + j);
 					}
 				}
 				break;
@@ -732,7 +733,7 @@ loop:
 }
 
 static int __init quotes_init(void) {
-	int ret, val = 1024 * 1024, one = 1;
+	int val = 1024 * 1024, ret, one = 1;
 
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
