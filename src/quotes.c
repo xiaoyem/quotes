@@ -728,7 +728,7 @@ static int __init quotes_init(void) {
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
 		!strcmp(brokerid, "") || userid == NULL || !strcmp(userid, "") || passwd == NULL ||
-		!strcmp(passwd, "") || (count == 1 && !strcmp(contracts[0], ""))) {
+		!strcmp(passwd, "") || count == 0 || (count == 1 && !strcmp(contracts[0], ""))) {
 		printk(KERN_ERR "[%s] multicast_ip, multicast_port, quote_ip, quote_port, "
 			"brokerid, userid, passwd or contracts can't be NULL\n", __func__);
 		return -EINVAL;
