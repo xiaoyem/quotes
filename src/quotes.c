@@ -60,7 +60,8 @@ static char *multicast_ip;
 static int multicast_port;
 static char *quote_ip;
 static int quote_port;
-static char *brokerid, *userid, *passwd, *contracts;
+static char *brokerid, *userid, *passwd, *contracts[2048];
+static int count;
 module_param(multicast_ip, charp, 0000);
 module_param(multicast_port, int, 0000);
 module_param(quote_ip,     charp, 0000);
@@ -68,7 +69,7 @@ module_param(quote_port,     int, 0000);
 module_param(brokerid,     charp, 0000);
 module_param(userid,       charp, 0000);
 module_param(passwd,       charp, 0000);
-module_param(contracts,    charp, 0000);
+module_param_array(contracts, charp, &count, 0000);
 static struct client sh;
 
 /* FIXME */
@@ -549,21 +550,10 @@ static void process_inbuf(struct client *c) {
 				{
 					struct info *info = (struct info *)(sh->buf + 4);
 
-					if (info->errid == 0) {
-						int len = strlen(contracts);
-
-						for (i = 0, j = 0; i < len; ++i)
-							if (contracts[i] == ',') {
-								if (j < i) {
-									contracts[i] = '\0';
-									subscribe(c, contracts + j);
-									contracts[i] = ',';
-								}
-								j = i + 1;
-							}
-						if (j < i)
-							subscribe(c, contracts + j);
-					}
+					if (info->errid == 0)
+						for (i = 0; i < count; ++i)
+							if (strcmp(contracts[i], ""))
+								subscribe(c, contracts[i]);
 				}
 				break;
 			case 0x02440000:
@@ -738,7 +728,7 @@ static int __init quotes_init(void) {
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
 		!strcmp(brokerid, "") || userid == NULL || !strcmp(userid, "") || passwd == NULL ||
-		!strcmp(passwd, "") || contracts == NULL || !strcmp(contracts, "")) {
+		!strcmp(passwd, "") || (count == 1 && !strcmp(contracts[0], ""))) {
 		printk(KERN_ERR "[%s] multicast_ip, multicast_port, quote_ip, quote_port, "
 			"brokerid, userid, passwd or contracts can't be NULL\n", __func__);
 		return -EINVAL;
