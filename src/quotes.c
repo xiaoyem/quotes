@@ -763,6 +763,7 @@ static int __init quotes_init(void) {
 	}
 	/* FIXME */
 	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
 		printk(KERN_ERR "[%s] error creating quotes thread\n", __func__);
