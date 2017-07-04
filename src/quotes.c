@@ -683,6 +683,7 @@ static int quotes_thread(void *data) {
 			c->timer.function = timer_func;
 			c->timer.data     = (unsigned long)c;
 			add_timer(&c->timer);
+			c->inpos = 0;
 			printk(KERN_INFO "[%s] sending heartbeat timeout\n", __func__);
 			send_hbtimeout(c);
 			printk(KERN_INFO "[%s] logging in\n", __func__);
