@@ -691,7 +691,7 @@ static int quotes_thread(void *data) {
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
 		if (atomic_read((atomic_t *)&c->disconnected)) {
-			int ret, one = 1;
+			int ret, one = 1, val = 1024 * 1024;
 
 			if (timer_pending(&c->timer))
 				del_timer(&c->timer);
@@ -717,6 +717,7 @@ loop:
 			}
 			/* FIXME */
 			kernel_setsockopt(c->csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+			kernel_setsockopt(c->csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 			atomic_set((atomic_t *)&c->disconnected, 0);
 		}
 	}
