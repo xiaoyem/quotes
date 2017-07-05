@@ -691,7 +691,7 @@ static int quotes_thread(void *data) {
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
 		if (atomic_read((atomic_t *)&c->disconnected)) {
-			int ret, one = 1, val = 1024 * 1024;
+			int ret, one = 1, val = 2 * 1024 * 1024;
 
 			if (timer_pending(&c->timer))
 				del_timer(&c->timer);
@@ -725,7 +725,7 @@ loop:
 }
 
 static int __init quotes_init(void) {
-	int val = 1024 * 1024, ret, one = 1;
+	int val = 2 * 1024 * 1024, ret, one = 1;
 
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||

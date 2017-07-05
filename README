@@ -9,3 +9,5 @@ quote_ip=<qt_ip> quote_port=<qt_port> brokerid=<broker> userid=<user> \
 passwd=<pass> contracts='"<cont1,cont2,cont3...>"'
 5) ./test-recver <mc_ip> <mc_port>
 
+Try 'tuned-adm profile network-latency' if running on a non-virtual host.
+
