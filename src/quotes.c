@@ -35,8 +35,8 @@
 #include <linux/timer.h>
 #include <net/sock.h>
 #include <net/tcp.h>
-#include "shfe.h"
 #include "btree.h"
+#include "shfe.h"
 
 /* FIXME */
 struct client {
@@ -290,7 +290,54 @@ static inline void handle_12packet(struct client *c, struct quote *quote) {
 	handle_double(&c->quote->ask5);
 	handle_double(&c->quote->average);
 	if (quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote) < 0)
-		printk(KERN_ERR "[%s] send quote failed\n", __func__);
+		printk(KERN_ERR "[%s] send quote '%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,"
+			"%f,%f,%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
+			"%f,%d,%f,%d,%f,%s' failed\n",
+			__func__,
+			c->quote->td_day,
+			c->quote->instid,
+			c->quote->excid,
+			c->quote->exc_instid,
+			c->quote->last,
+			c->quote->presettle,
+			c->quote->preclose,
+			c->quote->preopenint,
+			c->quote->open,
+			c->quote->high,
+			c->quote->low,
+			c->quote->volume,
+			c->quote->turnover,
+			c->quote->openint,
+			c->quote->close,
+			c->quote->settle,
+			c->quote->upperlimit,
+			c->quote->lowerlimit,
+			c->quote->predelta,
+			c->quote->delta,
+			c->quote->time,
+			c->quote->msec,
+			c->quote->bid1,
+			c->quote->bvol1,
+			c->quote->ask1,
+			c->quote->avol1,
+			c->quote->bid2,
+			c->quote->bvol2,
+			c->quote->ask2,
+			c->quote->avol2,
+			c->quote->bid3,
+			c->quote->bvol3,
+			c->quote->ask3,
+			c->quote->avol3,
+			c->quote->bid4,
+			c->quote->bvol4,
+			c->quote->ask4,
+			c->quote->avol4,
+			c->quote->bid5,
+			c->quote->bvol5,
+			c->quote->ask5,
+			c->quote->avol5,
+			c->quote->average,
+			c->quote->at_day);
 }
 
 static inline void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
@@ -591,8 +638,56 @@ static void process_inbuf(struct client *c) {
 					}
 					if (count > 0 && c->quote && quotes_send(c->msock,
 						(unsigned char *)c->quote, sizeof *c->quote) < 0)
-						printk(KERN_ERR "[%s] send quote failed\n",
-							__func__);
+						printk(KERN_ERR "[%s] send quote '%s,%s,%s,%s,%f,"
+							"%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,%f,%f,"
+							"%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,"
+							"%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%s'"
+							" failed\n",
+							__func__,
+							c->quote->td_day,
+							c->quote->instid,
+							c->quote->excid,
+							c->quote->exc_instid,
+							c->quote->last,
+							c->quote->presettle,
+							c->quote->preclose,
+							c->quote->preopenint,
+							c->quote->open,
+							c->quote->high,
+							c->quote->low,
+							c->quote->volume,
+							c->quote->turnover,
+							c->quote->openint,
+							c->quote->close,
+							c->quote->settle,
+							c->quote->upperlimit,
+							c->quote->lowerlimit,
+							c->quote->predelta,
+							c->quote->delta,
+							c->quote->time,
+							c->quote->msec,
+							c->quote->bid1,
+							c->quote->bvol1,
+							c->quote->ask1,
+							c->quote->avol1,
+							c->quote->bid2,
+							c->quote->bvol2,
+							c->quote->ask2,
+							c->quote->avol2,
+							c->quote->bid3,
+							c->quote->bvol3,
+							c->quote->ask3,
+							c->quote->avol3,
+							c->quote->bid4,
+							c->quote->bvol4,
+							c->quote->ask4,
+							c->quote->avol4,
+							c->quote->bid5,
+							c->quote->bvol5,
+							c->quote->ask5,
+							c->quote->avol5,
+							c->quote->average,
+							c->quote->at_day);
 				}
 				break;
 			default:
@@ -643,13 +738,13 @@ static void quote_free(void *value) {
 
 /* FIXME */
 static int quotes_connect(struct socket *sock, const char *ip, int port, int flags) {
-	struct sockaddr_in s;
+	struct sockaddr_in sa;
 
-	memset(&s, '\0', sizeof s);
-	s.sin_family      = AF_INET;
-	s.sin_addr.s_addr = in_aton(ip);
-	s.sin_port        = htons(port);
-	return sock->ops->connect(sock, (struct sockaddr *)&s, sizeof s, flags);
+	memset(&sa, '\0', sizeof sa);
+	sa.sin_family      = AF_INET;
+	sa.sin_addr.s_addr = in_aton(ip);
+	sa.sin_port        = htons(port);
+	return sock->ops->connect(sock, (struct sockaddr *)&sa, sizeof sa, flags);
 }
 
 static int quotes_thread(void *data) {
@@ -691,7 +786,7 @@ static int quotes_thread(void *data) {
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
 		if (atomic_read((atomic_t *)&c->disconnected)) {
-			int ret, one = 1, val = 2 * 1024 * 1024;
+			int ret, one = 1, val = 8 * 1024 * 1024;
 
 			if (timer_pending(&c->timer))
 				del_timer(&c->timer);
@@ -717,6 +812,7 @@ loop:
 			}
 			/* FIXME */
 			kernel_setsockopt(c->csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+			kernel_setsockopt(c->csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
 			kernel_setsockopt(c->csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 			atomic_set((atomic_t *)&c->disconnected, 0);
 		}
@@ -725,7 +821,7 @@ loop:
 }
 
 static int __init quotes_init(void) {
-	int val = 2 * 1024 * 1024, ret, one = 1;
+	int val = 8 * 1024 * 1024, ret, one = 1;
 
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
@@ -765,6 +861,7 @@ static int __init quotes_init(void) {
 	}
 	/* FIXME */
 	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
 	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
