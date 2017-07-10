@@ -697,9 +697,13 @@ static void process_inbuf(struct client *c) {
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
 			/* printk(KERN_INFO "[%s] receiving heartbeat\n", __func__); */
 			ftd_cont_len = ftd_extd_len;
-		} else
+		} else {
 			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d\n",
 				__func__, ftd_type, ftd_cont_len);
+			/* FIXME */
+			c->inpos = 0;
+			return;
+		}
 		start    += ftd_cont_len + 4;
 		c->inpos -= ftd_cont_len + 4;
 	}
