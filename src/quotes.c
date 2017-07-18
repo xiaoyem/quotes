@@ -147,7 +147,7 @@ static void send_hbtimeout(struct client *c) {
 }
 
 /* FIXME */
-static void send_heartbeat(struct client *c) {
+static inline void send_heartbeat(struct client *c) {
 	struct heartbeat hb;
 
 	hb.ftd_type        = 0x00;
@@ -790,7 +790,7 @@ static int quotes_thread(void *data) {
 			atomic_set((atomic_t *)&c->connected, 0);
 		}
 		if (atomic_read((atomic_t *)&c->disconnected)) {
-			int ret, one = 1, val = 8 * 1024 * 1024;
+			int one = 1, val = 8 * 1024 * 1024, ret;
 
 			if (timer_pending(&c->timer))
 				del_timer(&c->timer);
@@ -806,6 +806,9 @@ loop:
 			/* FIXME */
 			c->csock->sk->sk_allocation = GFP_ATOMIC;
 			set_sock_callbacks(c->csock, c);
+			kernel_setsockopt(c->csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+			kernel_setsockopt(c->csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
+			kernel_setsockopt(c->csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 			/* FIXME */
 			if ((ret = quotes_connect(c->csock, quote_ip, quote_port, O_NONBLOCK))
 				== -EINPROGRESS) {
@@ -814,10 +817,6 @@ loop:
 				sock_release(c->csock);
 				goto loop;
 			}
-			/* FIXME */
-			kernel_setsockopt(c->csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
-			kernel_setsockopt(c->csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
-			kernel_setsockopt(c->csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 			atomic_set((atomic_t *)&c->disconnected, 0);
 		}
 	}
@@ -825,7 +824,7 @@ loop:
 }
 
 static int __init quotes_init(void) {
-	int val = 8 * 1024 * 1024, ret, one = 1;
+	int val = 8 * 1024 * 1024, one = 1, ret;
 
 	if (multicast_ip == NULL || !strcmp(multicast_ip, "") || multicast_port == 0 ||
 		quote_ip == NULL || !strcmp(quote_ip, "") || quote_port == 0 || brokerid == NULL ||
@@ -843,12 +842,12 @@ static int __init quotes_init(void) {
 		printk(KERN_ERR "[%s] error creating multicast socket\n", __func__);
 		return -EIO;
 	}
+	/* FIXME */
+	kernel_setsockopt(sh.msock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	if (quotes_connect(sh.msock, multicast_ip, multicast_port, 0) < 0) {
 		printk(KERN_ERR "[%s] error connecting multicast address\n", __func__);
 		goto end;
 	}
-	/* FIXME */
-	kernel_setsockopt(sh.msock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &sh.csock) < 0) {
 		printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 		goto end;
@@ -856,6 +855,9 @@ static int __init quotes_init(void) {
 	/* FIXME */
 	sh.csock->sk->sk_allocation = GFP_ATOMIC;
 	set_sock_callbacks(sh.csock, &sh);
+	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
+	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	/* FIXME */
 	if ((ret = quotes_connect(sh.csock, quote_ip, quote_port, O_NONBLOCK)) == -EINPROGRESS) {
 	} else if (ret < 0) {
@@ -863,10 +865,6 @@ static int __init quotes_init(void) {
 		sock_release(sh.csock);
 		goto end;
 	}
-	/* FIXME */
-	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
-	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
-	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
 	if (IS_ERR(sh.task)) {
 		printk(KERN_ERR "[%s] error creating quotes thread\n", __func__);
