@@ -33,21 +33,6 @@
 
 /* FIXME */
 #pragma pack(push, 1)
-struct hbtimeout {
-	char			ftd_type;         /* FTDTypeNone */
-	char			ftd_extd_length;  /* 0x06 */
-	unsigned short		ftd_cont_length;
-	char			tag_type;         /* 0x07 */
-	char			tag_length;       /* 0x04 */
-	unsigned		timeout;
-};
-struct heartbeat {
-	char			ftd_type;         /* FTDTypeNone */
-	char			ftd_extd_length;  /* 0x02 */
-	unsigned short		ftd_cont_length;
-	char			tag_type;         /* 0x05 */
-	char			tag_length;
-};
 struct cffexheader {
 	char			ftd_type;         /* FTDTypeCompressed? */
 	char			ftd_extd_length;
@@ -62,7 +47,36 @@ struct cffexheader {
 	unsigned short		fld_count;        /* FieldCount */
 	unsigned short		ftdc_cont_length; /* FTDCContentLength */
 	unsigned		rid;              /* RequestID */
+	unsigned		unknown;          /* FIXME */
 	char			buf[0];
+};
+struct login_zj {
+	struct cffexheader	header;
+	unsigned short		type;
+	unsigned short		length;
+	char			td_day[9];        /* TradingDay */
+	char			userid[16];       /* UserID */
+	char			brokerid[11];     /* BrokerID */
+	char			passwd[41];       /* Password */
+	char			upi[41];          /* UserProductInfo */
+	char			ipi[41];          /* InterfaceProductInfo */
+	char			pi[41];           /* ProtocolInfo */
+	char			ip[21];           /* IPAddress */
+	char			mac[21];          /* MacAddress */
+	int			dcid;             /* DataCenterID */
+	int			upfs;             /* UserProductFileSize */
+	unsigned short		type1;
+	unsigned short		length1;
+	int			seq_series1;      /* SequenceSeries */
+	int			seq_number1;      /* SequenceNo */
+	unsigned short		type4;
+	unsigned short		length4;
+	int			seq_series4;
+	int			seq_number4;
+	unsigned short		type64;
+	unsigned short		length64;
+	int			seq_series64;
+	int			seq_number64;
 };
 #pragma pack(pop)
 

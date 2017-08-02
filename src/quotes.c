@@ -37,6 +37,7 @@
 #include <net/tcp.h>
 #include "btree.h"
 #include "shfe.h"
+#include "cffex.h"
 
 /* FIXME */
 struct client {
@@ -56,12 +57,14 @@ struct client {
 };
 
 /* FIXME */
+static int usefemas = 0;
 static char *multicast_ip;
 static int multicast_port;
 static char *quote_ip;
 static int quote_port;
 static char *brokerid, *userid, *passwd, *contracts[2048];
 static int count;
+module_param(usefemas,       int, 0000);
 module_param(multicast_ip, charp, 0000);
 module_param(multicast_port, int, 0000);
 module_param(quote_ip,     charp, 0000);
@@ -70,7 +73,7 @@ module_param(brokerid,     charp, 0000);
 module_param(userid,       charp, 0000);
 module_param(passwd,       charp, 0000);
 module_param_array(contracts, charp, &count, 0000);
-static struct client sh;
+static struct client ct;
 
 /* FIXME */
 static int quotes_send(struct socket *sock, unsigned char *buf, int len) {
@@ -141,7 +144,7 @@ static void send_hbtimeout(struct client *c) {
 	to.ftd_cont_length = 0x0000;
 	to.tag_type        = 0x07;
 	to.tag_length      = 0x04;
-	to.timeout         = 0x27000000;
+	to.timeout         = usefemas ? 0x14000000 : 0x27000000;
 	if (quotes_send(c->csock, (unsigned char *)&to, sizeof to) < 0)
 		printk(KERN_ERR "[%s] send failed\n", __func__);
 }
@@ -160,88 +163,178 @@ static inline void send_heartbeat(struct client *c) {
 }
 
 static void login(struct client *c) {
-	struct login lo;
-	struct timeval time;
-	struct tm tm;
 	struct net *net = sock_net(c->csock->sk);
 	struct net_device *dev;
 
-	memset(&lo, '\0', sizeof lo);
-	lo.header.ftd_type         = 0x02;
-	lo.header.ftd_cont_length  = 0xea00;
-	lo.header.version          = 0x01;
-	lo.header.unenc_length     = 0x0b;
-	lo.header.chain            = 0x4c;
-	lo.header.seq_number       = 0x00300000;
-	lo.header.fld_count        = 0x0300;
-	lo.header.ftdc_cont_length = 0xd400;
-	lo.header.rid              = 0x01000000;
-	lo.type                    = 0x0210;
-	lo.length                  = 0xbc00;
-	do_gettimeofday(&time);
-	time_to_tm(time.tv_sec, 0, &tm);
-	snprintf(lo.td_day, sizeof lo.td_day, "%04ld%02d%02d",
-		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-	strncat(lo.brokerid, brokerid, sizeof lo.brokerid - 1);
-	strncat(lo.userid,   userid,   sizeof lo.userid   - 1);
-	strncat(lo.passwd,   passwd,   sizeof lo.passwd   - 1);
-	/* FIXME */
-	lo.ipi[0]                  = 'T';
-	lo.ipi[1]                  = 'H';
-	lo.ipi[2]                  = 'O';
-	lo.ipi[3]                  = 'S';
-	lo.ipi[4]                  = 'T';
-	lo.ipi[5]                  = ' ';
-	lo.ipi[6]                  = 'U';
-	lo.ipi[7]                  = 's';
-	lo.ipi[8]                  = 'e';
-	lo.ipi[9]                  = 'r';
-	lo.pi[0]                   = 'F';
-	lo.pi[1]                   = 'T';
-	lo.pi[2]                   = 'D';
-	lo.pi[3]                   = 'C';
-	lo.pi[4]                   = ' ';
-	lo.pi[5]                   = '0';
-	/* FIXME */
-	for_each_netdev(net, dev)
-		if (strcmp(dev->name, "lo")) {
-			snprintf(lo.mac, sizeof lo.mac, "%02X:%02X:%02X:%02X:%02X:%02X",
-				dev->dev_addr[0],
-				dev->dev_addr[1],
-				dev->dev_addr[2],
-				dev->dev_addr[3],
-				dev->dev_addr[4],
-				dev->dev_addr[5]);
-			break;
-		}
-	lo.type1                   = 0x0110;
-	lo.length1                 = 0x0600;
-	lo.seq_series1             = 0x0100;
-	lo.type4                   = 0x0110;
-	lo.length4                 = 0x0600;
-	lo.seq_series4             = 0x0400;
-	if (quotes_send(c->csock, (unsigned char *)&lo, sizeof lo) < 0)
-		printk(KERN_ERR "[%s] send failed\n", __func__);
+	if (usefemas) {
+		struct login_zj lo;
+		struct sockaddr_in sa;
+		int len;
+
+		memset(&lo, '\0', sizeof lo);
+		lo.header.ftd_type         = 0x02;
+		lo.header.ftd_cont_length  = 0x3c01;
+		lo.header.version          = 0x01;
+		lo.header.unenc_length     = 0x01;
+		lo.header.chain            = 0x4c;
+		lo.header.seq_number       = 0x01500000;
+		lo.header.fld_count        = 0x0400;
+		lo.header.ftdc_cont_length = 0x2201;
+		lo.type                    = 0x0130;
+		lo.length                  = 0xfa00;
+		strncat(lo.userid,   userid,   sizeof lo.userid   - 1);
+		strncat(lo.brokerid, brokerid, sizeof lo.brokerid - 1);
+		strncat(lo.passwd,   passwd,   sizeof lo.passwd   - 1);
+		/* FIXME */
+		lo.ipi[0]                  = 'L';
+		lo.ipi[1]                  = 'n';
+		lo.ipi[2]                  = 'x';
+		lo.ipi[3]                  = '6';
+		lo.ipi[4]                  = '4';
+		lo.ipi[5]                  = ' ';
+		lo.ipi[6]                  = 'F';
+		lo.ipi[7]                  = 'e';
+		lo.ipi[8]                  = 'm';
+		lo.ipi[9]                  = 'a';
+		lo.ipi[10]                 = 's';
+		lo.ipi[11]                 = '_';
+		lo.ipi[12]                 = 'A';
+		lo.ipi[13]                 = 'l';
+		lo.ipi[14]                 = 'l';
+		lo.ipi[15]                 = 'F';
+		lo.ipi[16]                 = 'u';
+		lo.ipi[17]                 = 't';
+		lo.ipi[18]                 = 'u';
+		lo.ipi[19]                 = 'r';
+		lo.ipi[20]                 = 'e';
+		lo.ipi[21]                 = 's';
+		lo.ipi[22]                 = '_';
+		lo.ipi[23]                 = '1';
+		lo.ipi[24]                 = '.';
+		lo.ipi[25]                 = '0';
+		lo.ipi[26]                 = '1';
+		lo.ipi[27]                 = ' ';
+		lo.ipi[28]                 = 'L';
+		lo.ipi[29]                 = '3';
+		lo.ipi[30]                 = '0';
+		lo.ipi[31]                 = '0';
+		lo.pi[0]                   = 'F';
+		lo.pi[1]                   = 'T';
+		lo.pi[2]                   = 'D';
+		lo.pi[3]                   = 'C';
+		lo.pi[4]                   = ' ';
+		lo.pi[5]                   = '0';
+		/* FIXME */
+		c->csock->ops->getname(c->csock, (struct sockaddr *)&sa, &len, 0);
+		snprintf(lo.ip, sizeof lo.ip, "%pI4", &sa.sin_addr);
+		for_each_netdev(net, dev)
+			if (strcmp(dev->name, "lo")) {
+				snprintf(lo.mac, sizeof lo.mac, "%02X:%02X:%02X:%02X:%02X:%02X%c",
+					dev->dev_addr[0],
+					dev->dev_addr[1],
+					dev->dev_addr[2],
+					dev->dev_addr[3],
+					dev->dev_addr[4],
+					dev->dev_addr[5], 0x0a);
+				break;
+			}
+		lo.upfs                    = 0x583b0000;
+		lo.type1                   = 0x3330;
+		lo.length1                 = 0x0800;
+		lo.seq_series1             = 0x01000000;
+		lo.type4                   = 0x3330;
+		lo.length4                 = 0x0800;
+		lo.seq_series4             = 0x04000000;
+		lo.type64                  = 0x3330;
+		lo.length64                = 0x0800;
+		lo.seq_series64            = 0x64000000;
+		lo.seq_number64            = 0xffffffff;
+		if (quotes_send(c->csock, (unsigned char *)&lo, sizeof lo) < 0)
+			printk(KERN_ERR "[%s] send failed\n", __func__);
+	} else {
+		struct login_sh lo;
+		struct timeval time;
+		struct tm tm;
+
+		memset(&lo, '\0', sizeof lo);
+		lo.header.ftd_type         = 0x02;
+		lo.header.ftd_cont_length  = 0xea00;
+		lo.header.version          = 0x01;
+		lo.header.unenc_length     = 0x0b;
+		lo.header.chain            = 0x4c;
+		lo.header.seq_number       = 0x00300000;
+		lo.header.fld_count        = 0x0300;
+		lo.header.ftdc_cont_length = 0xd400;
+		lo.type                    = 0x0210;
+		lo.length                  = 0xbc00;
+		do_gettimeofday(&time);
+		time_to_tm(time.tv_sec, 0, &tm);
+		snprintf(lo.td_day, sizeof lo.td_day, "%04ld%02d%02d",
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+		strncat(lo.brokerid, brokerid, sizeof lo.brokerid - 1);
+		strncat(lo.userid,   userid,   sizeof lo.userid   - 1);
+		strncat(lo.passwd,   passwd,   sizeof lo.passwd   - 1);
+		/* FIXME */
+		lo.ipi[0]                  = 'T';
+		lo.ipi[1]                  = 'H';
+		lo.ipi[2]                  = 'O';
+		lo.ipi[3]                  = 'S';
+		lo.ipi[4]                  = 'T';
+		lo.ipi[5]                  = ' ';
+		lo.ipi[6]                  = 'U';
+		lo.ipi[7]                  = 's';
+		lo.ipi[8]                  = 'e';
+		lo.ipi[9]                  = 'r';
+		lo.pi[0]                   = 'F';
+		lo.pi[1]                   = 'T';
+		lo.pi[2]                   = 'D';
+		lo.pi[3]                   = 'C';
+		lo.pi[4]                   = ' ';
+		lo.pi[5]                   = '0';
+		/* FIXME */
+		for_each_netdev(net, dev)
+			if (strcmp(dev->name, "lo")) {
+				snprintf(lo.mac, sizeof lo.mac, "%02X:%02X:%02X:%02X:%02X:%02X",
+					dev->dev_addr[0],
+					dev->dev_addr[1],
+					dev->dev_addr[2],
+					dev->dev_addr[3],
+					dev->dev_addr[4],
+					dev->dev_addr[5]);
+				break;
+			}
+		lo.type1                   = 0x0110;
+		lo.length1                 = 0x0600;
+		lo.seq_series1             = 0x0100;
+		lo.type4                   = 0x0110;
+		lo.length4                 = 0x0600;
+		lo.seq_series4             = 0x0400;
+		if (quotes_send(c->csock, (unsigned char *)&lo, sizeof lo) < 0)
+			printk(KERN_ERR "[%s] send failed\n", __func__);
+	}
 }
 
 /* FIXME */
 static void subscribe(struct client *c, const char *contract) {
-	struct subscribe sb;
+	if (usefemas) {
+	} else {
+		struct subscribe sb;
 
-	memset(&sb, '\0', sizeof sb);
-	sb.header.ftd_type         = 0x02;
-	sb.header.ftd_cont_length  = 0x3900;
-	sb.header.version          = 0x01;
-	sb.header.unenc_length     = 0x0b;
-	sb.header.chain            = 0x4c;
-	sb.header.seq_number       = 0x01440000;
-	sb.header.fld_count        = 0x0100;
-	sb.header.ftdc_cont_length = 0x2300;
-	sb.type                    = 0x4124;
-	sb.length                  = 0x1f00;
-	strncat(sb.instid, contract, sizeof sb.instid - 1);
-	if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
-		printk(KERN_ERR "[%s] send failed\n", __func__);
+		memset(&sb, '\0', sizeof sb);
+		sb.header.ftd_type         = 0x02;
+		sb.header.ftd_cont_length  = 0x3900;
+		sb.header.version          = 0x01;
+		sb.header.unenc_length     = 0x0b;
+		sb.header.chain            = 0x4c;
+		sb.header.seq_number       = 0x01440000;
+		sb.header.fld_count        = 0x0100;
+		sb.header.ftdc_cont_length = 0x2300;
+		sb.type                    = 0x4124;
+		sb.length                  = 0x1f00;
+		strncat(sb.instid, contract, sizeof sb.instid - 1);
+		if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
+			printk(KERN_ERR "[%s] send failed\n", __func__);
+	}
 }
 
 /* FIXME */
@@ -570,132 +663,148 @@ static void process_inbuf(struct client *c) {
 			break;
 		if (ftd_type == 0x02 && ftd_extd_len == 0x00 && ftd_cont_len > 0) {
 			int i, j;
-			struct shfeheader *sh = (struct shfeheader *)c->debuf;
 
-			/* FIXME */
-			c->debuf[0] = start[0];
-			c->debuf[1] = start[1];
-			c->debuf[2] = start[2];
-			c->debuf[3] = start[3];
-			c->debuf[4] = start[4];
-			c->debuf[5] = start[5];
-			c->debuf[6] = start[6];
-			c->debuf[7] = start[7];
-			for (i = 8, j = 8; i < ftd_cont_len + 4; ++i)
-				if (start[i] == 0xe0)
-					c->debuf[j++] = start[i++ + 1];
-				else if (start[i] >= 0xe1 && start[i] <= 0xef) {
-					int k, n = start[i] - 0xe0;
+			if (usefemas) {
+				print_buf(start, ftd_cont_len + 4);
+			} else {
+				struct shfeheader *sh = (struct shfeheader *)c->debuf;
 
-					for (k = 0; k < n; ++k)
-						c->debuf[j++] = 0x00;
-				} else
-					c->debuf[j++] = start[i];
-			/* print_buf(c->debuf, j); */
-			switch (sh->seq_number) {
-			case 0x01300000:
-				{
-					struct info *info = (struct info *)(sh->buf + 4);
+				/* FIXME */
+				c->debuf[0] = start[0];
+				c->debuf[1] = start[1];
+				c->debuf[2] = start[2];
+				c->debuf[3] = start[3];
+				c->debuf[4] = start[4];
+				c->debuf[5] = start[5];
+				c->debuf[6] = start[6];
+				c->debuf[7] = start[7];
+				for (i = 8, j = 8; i < ftd_cont_len + 4; ++i)
+					if (start[i] == 0xe0)
+						c->debuf[j++] = start[i++ + 1];
+					else if (start[i] >= 0xe1 && start[i] <= 0xef) {
+						int k, n = start[i] - 0xe0;
 
-					if (info->errid == 0)
-						for (i = 0; i < count; ++i)
-							if (strcmp(contracts[i], ""))
-								subscribe(c, contracts[i]);
-				}
-				break;
-			case 0x02440000:
-				{
-					struct info *info = (struct info *)(sh->buf + 4);
-					char *contract = (char *)(sh->buf + 4 + sizeof *info + 4);
+						for (k = 0; k < n; ++k)
+							c->debuf[j++] = 0x00;
+					} else
+						c->debuf[j++] = start[i];
+				/* print_buf(c->debuf, j); */
+				switch (sh->seq_number) {
+				case 0x01300000:
+					{
+						struct info *info = (struct info *)(sh->buf + 4);
 
-					if (info->errid != 0)
-						printk(KERN_INFO "[%s] subscribe '%s' failed\n",
-							__func__, contract);
-				}
-				break;
-			case 0x01f10000:
-				{
-					unsigned short *type   = (unsigned short *)sh->buf;
-					unsigned short *length = (unsigned short *)(sh->buf + 2);
-					struct quote *quote    = (struct quote *)(sh->buf + 4);
-
-					if (*type == 0x1200 && *length == 0x6201)
-						handle_12packet(c, quote);
-				}
-				break;
-			case 0x03f10000:
-				{
-					unsigned short count   = ntohs(sh->fld_count);
-					unsigned short *type   = (unsigned short *)sh->buf;
-					unsigned short *length = (unsigned short *)(sh->buf + 2);
-
-					for (i = 0; i < count; ++i) {
-						handle_24packet(c, type, length);
-						type   = (unsigned short *)((unsigned char *)type +
-							4 + ntohs(*length));
-						length = (unsigned short *)((unsigned char *)type +
-							2);
+						if (info->errid == 0)
+							for (i = 0; i < count; ++i)
+								if (strcmp(contracts[i], ""))
+									subscribe(c, contracts[i]);
 					}
-					if (count > 0 && c->quote && quotes_send(c->msock,
-						(unsigned char *)c->quote, sizeof *c->quote) < 0)
-						printk(KERN_ERR "[%s] send quote '%s,%s,%s,%s,%f,"
-							"%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,%f,%f,"
-							"%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,"
-							"%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%s'"
-							" failed\n",
-							__func__,
-							c->quote->td_day,
-							c->quote->instid,
-							c->quote->excid,
-							c->quote->exc_instid,
-							c->quote->last,
-							c->quote->presettle,
-							c->quote->preclose,
-							c->quote->preopenint,
-							c->quote->open,
-							c->quote->high,
-							c->quote->low,
-							c->quote->volume,
-							c->quote->turnover,
-							c->quote->openint,
-							c->quote->close,
-							c->quote->settle,
-							c->quote->upperlimit,
-							c->quote->lowerlimit,
-							c->quote->predelta,
-							c->quote->delta,
-							c->quote->time,
-							c->quote->msec,
-							c->quote->bid1,
-							c->quote->bvol1,
-							c->quote->ask1,
-							c->quote->avol1,
-							c->quote->bid2,
-							c->quote->bvol2,
-							c->quote->ask2,
-							c->quote->avol2,
-							c->quote->bid3,
-							c->quote->bvol3,
-							c->quote->ask3,
-							c->quote->avol3,
-							c->quote->bid4,
-							c->quote->bvol4,
-							c->quote->ask4,
-							c->quote->avol4,
-							c->quote->bid5,
-							c->quote->bvol5,
-							c->quote->ask5,
-							c->quote->avol5,
-							c->quote->average,
-							c->quote->at_day);
+					break;
+				case 0x02440000:
+					{
+						struct info *info = (struct info *)(sh->buf + 4);
+						char *contract = (char *)
+								(sh->buf + 4 + sizeof *info + 4);
+
+						if (info->errid != 0)
+							printk(KERN_INFO "[%s] subscribe '%s'"
+								" failed\n",
+								__func__, contract);
+					}
+					break;
+				case 0x01f10000:
+					{
+						unsigned short *type   = (unsigned short *)sh->buf;
+						unsigned short *length = (unsigned short *)
+									(sh->buf + 2);
+						struct quote *quote    = (struct quote *)
+									(sh->buf + 4);
+
+						if (*type == 0x1200 && *length == 0x6201)
+							handle_12packet(c, quote);
+					}
+					break;
+				case 0x03f10000:
+					{
+						unsigned short count   = ntohs(sh->fld_count);
+						unsigned short *type   = (unsigned short *)sh->buf;
+						unsigned short *length = (unsigned short *)
+									(sh->buf + 2);
+
+						for (i = 0; i < count; ++i) {
+							handle_24packet(c, type, length);
+							type   = (unsigned short *)
+								((unsigned char *)type + 4 +
+								ntohs(*length));
+							length = (unsigned short *)
+								((unsigned char *)type + 2);
+						}
+						if (count > 0 && c->quote && quotes_send(c->msock,
+							(unsigned char *)c->quote,
+							sizeof *c->quote) < 0)
+							printk(KERN_ERR "[%s] send quote '%s,%s,%s,"
+								"%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,"
+								"%f,%f,%f,%f,%f,%f,%s,%03d,%f,%d,"
+								"%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,"
+								"%d,%f,%d,%f,%d,%f,%d,%f,%s'"
+								" failed\n",
+								__func__,
+								c->quote->td_day,
+								c->quote->instid,
+								c->quote->excid,
+								c->quote->exc_instid,
+								c->quote->last,
+								c->quote->presettle,
+								c->quote->preclose,
+								c->quote->preopenint,
+								c->quote->open,
+								c->quote->high,
+								c->quote->low,
+								c->quote->volume,
+								c->quote->turnover,
+								c->quote->openint,
+								c->quote->close,
+								c->quote->settle,
+								c->quote->upperlimit,
+								c->quote->lowerlimit,
+								c->quote->predelta,
+								c->quote->delta,
+								c->quote->time,
+								c->quote->msec,
+								c->quote->bid1,
+								c->quote->bvol1,
+								c->quote->ask1,
+								c->quote->avol1,
+								c->quote->bid2,
+								c->quote->bvol2,
+								c->quote->ask2,
+								c->quote->avol2,
+								c->quote->bid3,
+								c->quote->bvol3,
+								c->quote->ask3,
+								c->quote->avol3,
+								c->quote->bid4,
+								c->quote->bvol4,
+								c->quote->ask4,
+								c->quote->avol4,
+								c->quote->bid5,
+								c->quote->bvol5,
+								c->quote->ask5,
+								c->quote->avol5,
+								c->quote->average,
+								c->quote->at_day);
+					}
+					break;
+				default:
+					print_buf(c->debuf, j);
+					break;
 				}
-				break;
-			default:
-				print_buf(c->debuf, j);
-				break;
 			}
 		} else if (ftd_type == 0x00 && ftd_extd_len == 0x02) {
 			/* printk(KERN_INFO "[%s] receiving heartbeat\n", __func__); */
+			ftd_cont_len = ftd_extd_len;
+		} else if (ftd_type == 0x00 && ftd_extd_len == 0x06) {
+			printk(KERN_INFO "[%s] receiving heartbeat timeout\n", __func__);
 			ftd_cont_len = ftd_extd_len;
 		} else {
 			printk(KERN_ERR "[%s] unknown packet type = 0x%02x, length = %d\n",
@@ -714,10 +823,11 @@ static void process_inbuf(struct client *c) {
 /* FIXME */
 static void timer_func(unsigned long data) {
 	struct client *c = (struct client *)data;
+	int tv = usefemas ? 21 : 15;
 
 	atomic_set((atomic_t *)&c->heartbeat, 1);
 	init_timer(&c->timer);
-	c->timer.expires  = jiffies + 15 * HZ;
+	c->timer.expires  = jiffies + tv * HZ;
 	c->timer.function = timer_func;
 	c->timer.data     = (unsigned long)c;
 	add_timer(&c->timer);
@@ -777,8 +887,10 @@ static int quotes_thread(void *data) {
 			atomic_dec((atomic_t *)&c->dataready);
 		}
 		if (atomic_read((atomic_t *)&c->connected)) {
+			int tv = usefemas ? 21 : 15;
+
 			init_timer(&c->timer);
-			c->timer.expires  = jiffies + 15 * HZ;
+			c->timer.expires  = jiffies + tv * HZ;
 			c->timer.function = timer_func;
 			c->timer.data     = (unsigned long)c;
 			add_timer(&c->timer);
@@ -798,7 +910,7 @@ static int quotes_thread(void *data) {
 
 loop:
 			/* FIXME */
-			schedule_timeout_uninterruptible(15 * HZ);
+			schedule_timeout_uninterruptible(5 * HZ);
 			if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &c->csock) < 0) {
 				printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 				goto loop;
@@ -834,60 +946,60 @@ static int __init quotes_init(void) {
 			"brokerid, userid, passwd or contracts can't be NULL\n", __func__);
 		return -EINVAL;
 	}
-	if ((sh.btree = btree_new(256, NULL, NULL, quote_free)) == NULL) {
+	if ((ct.btree = btree_new(256, NULL, NULL, quote_free)) == NULL) {
 		printk(KERN_ERR "[%s] error allocating quote cache\n", __func__);
 		return -ENOMEM;
 	}
-	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &sh.msock) < 0) {
+	if (sock_create_kern(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &ct.msock) < 0) {
 		printk(KERN_ERR "[%s] error creating multicast socket\n", __func__);
 		return -EIO;
 	}
 	/* FIXME */
-	kernel_setsockopt(sh.msock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
-	if (quotes_connect(sh.msock, multicast_ip, multicast_port, 0) < 0) {
+	kernel_setsockopt(ct.msock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
+	if (quotes_connect(ct.msock, multicast_ip, multicast_port, 0) < 0) {
 		printk(KERN_ERR "[%s] error connecting multicast address\n", __func__);
 		goto end;
 	}
-	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &sh.csock) < 0) {
+	if (sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, &ct.csock) < 0) {
 		printk(KERN_ERR "[%s] error creating client socket\n", __func__);
 		goto end;
 	}
 	/* FIXME */
-	sh.csock->sk->sk_allocation = GFP_ATOMIC;
-	set_sock_callbacks(sh.csock, &sh);
-	kernel_setsockopt(sh.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
-	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
-	kernel_setsockopt(sh.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
+	ct.csock->sk->sk_allocation = GFP_ATOMIC;
+	set_sock_callbacks(ct.csock, &ct);
+	kernel_setsockopt(ct.csock, SOL_TCP, TCP_NODELAY, (char *)&one, sizeof one);
+	kernel_setsockopt(ct.csock, SOL_SOCKET, SO_RCVBUF, (char *)&val, sizeof val);
+	kernel_setsockopt(ct.csock, SOL_SOCKET, SO_SNDBUF, (char *)&val, sizeof val);
 	/* FIXME */
-	if ((ret = quotes_connect(sh.csock, quote_ip, quote_port, O_NONBLOCK)) == -EINPROGRESS) {
+	if ((ret = quotes_connect(ct.csock, quote_ip, quote_port, O_NONBLOCK)) == -EINPROGRESS) {
 	} else if (ret < 0) {
 		printk(KERN_ERR "[%s] error connecting quote address\n", __func__);
-		sock_release(sh.csock);
+		sock_release(ct.csock);
 		goto end;
 	}
-	sh.task = kthread_create(quotes_thread, &sh, "quotes_sh");
-	if (IS_ERR(sh.task)) {
+	ct.task = kthread_create(quotes_thread, &ct, usefemas ? "quote_zj" : "quotes_sh");
+	if (IS_ERR(ct.task)) {
 		printk(KERN_ERR "[%s] error creating quotes thread\n", __func__);
-		sock_release(sh.csock);
+		sock_release(ct.csock);
 		goto end;
 	}
-	kthread_bind(sh.task, 1);
-	wake_up_process(sh.task);
+	kthread_bind(ct.task, 1);
+	wake_up_process(ct.task);
 	return 0;
 
 end:
-	sock_release(sh.msock);
+	sock_release(ct.msock);
 	return -EIO;
 }
 
 /* FIXME */
 static void __exit quotes_exit(void) {
-	if (timer_pending(&sh.timer))
-		del_timer(&sh.timer);
-	kthread_stop(sh.task);
-	sock_release(sh.csock);
-	sock_release(sh.msock);
-	btree_free(&sh.btree);
+	if (timer_pending(&ct.timer))
+		del_timer(&ct.timer);
+	kthread_stop(ct.task);
+	sock_release(ct.csock);
+	sock_release(ct.msock);
+	btree_free(&ct.btree);
 }
 
 module_init(quotes_init);

@@ -64,7 +64,7 @@ struct shfeheader {
 	unsigned		rid;              /* RequestID */
 	char			buf[0];
 };
-struct login {
+struct login_sh {
 	struct shfeheader	header;
 	unsigned short		type;
 	unsigned short		length;

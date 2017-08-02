@@ -32,7 +32,6 @@
  * adapted from CLRS, Chapter 18
  */
 
-#include <linux/compiler.h>
 #include <linux/list.h>
 #include <linux/slab.h>
 #include "btree.h"
