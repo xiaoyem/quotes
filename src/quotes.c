@@ -197,25 +197,25 @@ static void login(struct client *c) {
 		lo.ipi[8]                  = 'm';
 		lo.ipi[9]                  = 'a';
 		lo.ipi[10]                 = 's';
-		lo.ipi[11]                 = '_';
-		lo.ipi[12]                 = 'A';
-		lo.ipi[13]                 = 'l';
-		lo.ipi[14]                 = 'l';
-		lo.ipi[15]                 = 'F';
-		lo.ipi[16]                 = 'u';
-		lo.ipi[17]                 = 't';
-		lo.ipi[18]                 = 'u';
-		lo.ipi[19]                 = 'r';
-		lo.ipi[20]                 = 'e';
-		lo.ipi[21]                 = 's';
-		lo.ipi[22]                 = '_';
+		lo.ipi[11]                 = 'C';
+		lo.ipi[12]                 = 'l';
+		lo.ipi[13]                 = 'a';
+		lo.ipi[14]                 = 's';
+		lo.ipi[15]                 = 's';
+		lo.ipi[16]                 = 'i';
+		lo.ipi[17]                 = 'c';
+		lo.ipi[18]                 = 'A';
+		lo.ipi[19]                 = 'P';
+		lo.ipi[20]                 = 'I';
+		lo.ipi[21]                 = ' ';
+		lo.ipi[22]                 = 'v';
 		lo.ipi[23]                 = '1';
 		lo.ipi[24]                 = '.';
 		lo.ipi[25]                 = '0';
-		lo.ipi[26]                 = '1';
+		lo.ipi[26]                 = '3';
 		lo.ipi[27]                 = ' ';
 		lo.ipi[28]                 = 'L';
-		lo.ipi[29]                 = '3';
+		lo.ipi[29]                 = '4';
 		lo.ipi[30]                 = '0';
 		lo.ipi[31]                 = '0';
 		lo.pi[0]                   = 'F';
@@ -238,7 +238,7 @@ static void login(struct client *c) {
 					dev->dev_addr[5], 0x0a);
 				break;
 			}
-		lo.upfs                    = 0x583b0000;
+		lo.upfs                    = 0x18970000;
 		lo.type1                   = 0x3330;
 		lo.length1                 = 0x0800;
 		lo.seq_series1             = 0x01000000;
@@ -317,20 +317,58 @@ static void login(struct client *c) {
 /* FIXME */
 static void subscribe(struct client *c, const char *contract) {
 	if (usefemas) {
-	} else {
-		struct subscribe sb;
+		struct subscribe_zj sb;
 
 		memset(&sb, '\0', sizeof sb);
-		sb.header.ftd_type         = 0x02;
-		sb.header.ftd_cont_length  = 0x3900;
-		sb.header.version          = 0x01;
-		sb.header.unenc_length     = 0x0b;
-		sb.header.chain            = 0x4c;
-		sb.header.seq_number       = 0x01440000;
-		sb.header.fld_count        = 0x0100;
-		sb.header.ftdc_cont_length = 0x2300;
-		sb.type                    = 0x4124;
-		sb.length                  = 0x1f00;
+		sb.header.ftd_type          = 0x02;
+		sb.header.ftd_cont_length   = 0x3d00;
+		sb.header.version           = 0x01;
+		sb.header.unenc_length      = 0x01;
+		sb.header.chain             = 0x43;
+		sb.header.seq_series        = 0x0100;
+		sb.header.seq_number        = 0x72500000;
+		sb.header.prv_number        = 0x01000000;
+		sb.header.fld_count         = 0x0100;
+		sb.header.ftdc_cont_length  = 0x2300;
+		sb.type                     = 0x5230;
+		sb.length                   = 0x1f00;
+		strncat(sb.instid, contract, sizeof sb.instid - 1);
+		sb.header2.ftd_type         = 0x02;
+		sb.header2.ftd_cont_length  = 0x3e00;
+		sb.header2.version          = 0x01;
+		sb.header2.unenc_length     = 0x01;
+		sb.header2.chain            = 0x4c;
+		sb.header2.seq_series       = 0x0100;
+		sb.header2.seq_number       = 0x72500000;
+		sb.header2.prv_number       = 0x02000000;
+		sb.header2.fld_count        = 0x0300;
+		sb.header2.ftdc_cont_length = 0x2400;
+		sb.type1                    = 0x3330;
+		sb.length1                  = 0x0800;
+		sb.seq_series1              = 0x01000000;
+		sb.type4                    = 0x3330;
+		sb.length4                  = 0x0800;
+		sb.seq_series4              = 0x04000000;
+		sb.type64                   = 0x3330;
+		sb.length64                 = 0x0800;
+		sb.seq_series64             = 0x64000000;
+		sb.seq_number64             = 0xffffffff;
+		if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
+			printk(KERN_ERR "[%s] send failed\n", __func__);
+	} else {
+		struct subscribe_sh sb;
+
+		memset(&sb, '\0', sizeof sb);
+		sb.header.ftd_type          = 0x02;
+		sb.header.ftd_cont_length   = 0x3900;
+		sb.header.version           = 0x01;
+		sb.header.unenc_length      = 0x0b;
+		sb.header.chain             = 0x4c;
+		sb.header.seq_number        = 0x01440000;
+		sb.header.fld_count         = 0x0100;
+		sb.header.ftdc_cont_length  = 0x2300;
+		sb.type                     = 0x4124;
+		sb.length                   = 0x1f00;
 		strncat(sb.instid, contract, sizeof sb.instid - 1);
 		if (quotes_send(c->csock, (unsigned char *)&sb, sizeof sb) < 0)
 			printk(KERN_ERR "[%s] send failed\n", __func__);
@@ -665,7 +703,24 @@ static void process_inbuf(struct client *c) {
 			int i, j;
 
 			if (usefemas) {
-				print_buf(start, ftd_cont_len + 4);
+				struct cffexheader *ch = (struct cffexheader *)start;
+
+				switch (ch->seq_number) {
+				case 0x02500000:
+					{
+						struct info *info = (struct info *)(ch->buf + 4 +
+								sizeof (struct loginrsp) + 4);
+
+						if (info->errid == 0)
+							for (i = 0; i < count; ++i)
+								if (strcmp(contracts[i], ""))
+									subscribe(c, contracts[i]);
+					}
+					break;
+				default:
+					print_buf(start, ftd_cont_len + 4);
+					break;
+				}
 			} else {
 				struct shfeheader *sh = (struct shfeheader *)c->debuf;
 
@@ -716,9 +771,9 @@ static void process_inbuf(struct client *c) {
 					{
 						unsigned short *type   = (unsigned short *)sh->buf;
 						unsigned short *length = (unsigned short *)
-									(sh->buf + 2);
+								(sh->buf + 2);
 						struct quote *quote    = (struct quote *)
-									(sh->buf + 4);
+								(sh->buf + 4);
 
 						if (*type == 0x1200 && *length == 0x6201)
 							handle_12packet(c, quote);
@@ -729,7 +784,7 @@ static void process_inbuf(struct client *c) {
 						unsigned short count   = ntohs(sh->fld_count);
 						unsigned short *type   = (unsigned short *)sh->buf;
 						unsigned short *length = (unsigned short *)
-									(sh->buf + 2);
+								(sh->buf + 2);
 
 						for (i = 0; i < count; ++i) {
 							handle_24packet(c, type, length);

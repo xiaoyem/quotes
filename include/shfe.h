@@ -87,7 +87,7 @@ struct login_sh {
 	short			seq_series4;
 	int			seq_number4;
 };
-struct subscribe {
+struct subscribe_sh {
 	struct shfeheader	header;
 	unsigned short		type;
 	unsigned short		length;

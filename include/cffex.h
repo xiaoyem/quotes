@@ -78,6 +78,36 @@ struct login_zj {
 	int			seq_series64;
 	int			seq_number64;
 };
+struct subscribe_zj {
+	struct cffexheader	header;
+	unsigned short		type;
+	unsigned short		length;
+	char			instid[31];       /* InstrumentID */
+	struct cffexheader	header2;
+	unsigned short		type1;
+	unsigned short		length1;
+	int			seq_series1;      /* SequenceSeries */
+	int			seq_number1;      /* SequenceNo */
+	unsigned short		type4;
+	unsigned short		length4;
+	int			seq_series4;
+	int			seq_number4;
+	unsigned short		type64;
+	unsigned short		length64;
+	int			seq_series64;
+	int			seq_number64;
+};
+struct loginrsp {
+	char			td_day[9];        /* TradingDay */
+	char			brokerid[11];     /* BrokerID */
+	char			userid[16];       /* UserID */
+	char			log_time[9];      /* LoginTime */
+	char			max_locid[21];    /* MaxOrderLocalID */
+	char			ts_name[61];      /* TradingSystemName */
+	int			dcid;             /* DataCenterID */
+	int			pf_size;          /* PrivateFlowSize */
+	int			uf_size;          /* UserFlowSize */
+};
 #pragma pack(pop)
 
 #endif /* CFFEX_INCLUDED */
