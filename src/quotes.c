@@ -51,6 +51,7 @@ struct client {
 	u32			dataready;
 	u32			connected;
 	u32			disconnected;
+	u32			prvno;
 	u32			inpos;
 	unsigned char		inbuf[64 * 1024 * 1024];
 	unsigned char		debuf[8192];
@@ -327,7 +328,7 @@ static void subscribe(struct client *c, const char *contract) {
 		sb.header.chain             = 0x43;
 		sb.header.seq_series        = 0x0100;
 		sb.header.seq_number        = 0x72500000;
-		sb.header.prv_number        = 0x01000000;
+		sb.header.prv_number        = htonl(++c->prvno);
 		sb.header.fld_count         = 0x0100;
 		sb.header.ftdc_cont_length  = 0x2300;
 		sb.type                     = 0x5230;
@@ -340,7 +341,7 @@ static void subscribe(struct client *c, const char *contract) {
 		sb.header2.chain            = 0x4c;
 		sb.header2.seq_series       = 0x0100;
 		sb.header2.seq_number       = 0x72500000;
-		sb.header2.prv_number       = 0x02000000;
+		sb.header2.prv_number       = htonl(++c->prvno);
 		sb.header2.fld_count        = 0x0300;
 		sb.header2.ftdc_cont_length = 0x2400;
 		sb.type1                    = 0x3330;
