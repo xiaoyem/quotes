@@ -1,0 +1,19 @@
+# perf stat -d -p 3036 sleep 60
+
+ Performance counter stats for process id '3036':
+
+      59999.655111      task-clock (msec)         #    1.000 CPUs utilized          
+                66      context-switches          #    0.001 K/sec                  
+                 0      cpu-migrations            #    0.000 K/sec                  
+                 0      page-faults               #    0.000 K/sec                  
+   178,966,947,378      cycles                    #    2.983 GHz                      (50.00%)
+   744,105,428,997      instructions              #    4.16  insn per cycle           (62.50%)
+   208,362,974,626      branches                  # 3472.736 M/sec                    (62.50%)
+           768,443      branch-misses             #    0.00% of all branches          (62.50%)
+   268,028,612,203      L1-dcache-loads           # 4467.169 M/sec                    (62.50%)
+         2,336,519      L1-dcache-load-misses     #    0.00% of all L1-dcache hits    (62.50%)
+           257,101      LLC-loads                 #    0.004 M/sec                    (50.00%)
+             2,488      LLC-load-misses           #    0.97% of all LL-cache hits     (50.00%)
+
+      60.000588172 seconds time elapsed
+

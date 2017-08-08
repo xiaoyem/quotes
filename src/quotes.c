@@ -239,7 +239,7 @@ static void login(struct client *c) {
 					dev->dev_addr[5], 0x0a);
 				break;
 			}
-		lo.upfs                    = 0x18970000;
+		lo.upfs                    = 0x40970000;
 		lo.type1                   = 0x3330;
 		lo.length1                 = 0x0800;
 		lo.seq_series1             = 0x01000000;
