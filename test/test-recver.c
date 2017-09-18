@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 	rfd[0].events = POLLIN;
 	while (1) {
 		struct timespec timeout = {0, 5};
-		struct quote quote;
+		struct quote_sh quote;
 		socklen_t slen = sizeof sa;
 
 		/* FIXME */

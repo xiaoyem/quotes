@@ -42,7 +42,7 @@
 /* FIXME */
 struct client {
 	btree_t			btree;
-	struct quote		*quote;
+	void			*quote;
 	struct socket		*msock;
 	struct socket		*csock;
 	struct task_struct	*task;
@@ -56,6 +56,104 @@ struct client {
 	unsigned char		inbuf[64 * 1024 * 1024];
 	unsigned char		debuf[8192];
 };
+
+/* FIXME */
+#define PRINT_QUOTE_ZJ(quote) \
+	printk(KERN_ERR "[%s] send quote '%s,%s,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f," \
+		"%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d," \
+		"%s,%s,%03d' failed\n", \
+		__func__, \
+		quote->td_day, \
+		quote->sgid, \
+		quote->sid, \
+		quote->presettle, \
+		quote->preclose, \
+		quote->preopenint, \
+		quote->predelta, \
+		quote->open, \
+		quote->high, \
+		quote->low, \
+		quote->close, \
+		quote->upperlimit, \
+		quote->lowerlimit, \
+		quote->settle, \
+		quote->delta, \
+		quote->last, \
+		quote->volume, \
+		quote->turnover, \
+		quote->openint, \
+		quote->bid1, \
+		quote->bvol1, \
+		quote->ask1, \
+		quote->avol1, \
+		quote->bid2, \
+		quote->bvol2, \
+		quote->bid3, \
+		quote->bvol3, \
+		quote->ask2, \
+		quote->avol2, \
+		quote->ask3, \
+		quote->avol3, \
+		quote->bid4, \
+		quote->bvol4, \
+		quote->bid5, \
+		quote->bvol5, \
+		quote->ask4, \
+		quote->avol4, \
+		quote->ask5, \
+		quote->avol5, \
+		quote->instid, \
+		quote->time, \
+		quote->msec)
+#define PRINT_QUOTE_SH(quote) \
+	printk(KERN_ERR "[%s] send quote '%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f," \
+		"%f,%f,%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d," \
+		"%f,%d,%f,%d,%f,%s' failed\n", \
+		__func__, \
+		quote->td_day, \
+		quote->instid, \
+		quote->excid, \
+		quote->exc_instid, \
+		quote->last, \
+		quote->presettle, \
+		quote->preclose, \
+		quote->preopenint, \
+		quote->open, \
+		quote->high, \
+		quote->low, \
+		quote->volume, \
+		quote->turnover, \
+		quote->openint, \
+		quote->close, \
+		quote->settle, \
+		quote->upperlimit, \
+		quote->lowerlimit, \
+		quote->predelta, \
+		quote->delta, \
+		quote->time, \
+		quote->msec, \
+		quote->bid1, \
+		quote->bvol1, \
+		quote->ask1, \
+		quote->avol1, \
+		quote->bid2, \
+		quote->bvol2, \
+		quote->ask2, \
+		quote->avol2, \
+		quote->bid3, \
+		quote->bvol3, \
+		quote->ask3, \
+		quote->avol3, \
+		quote->bid4, \
+		quote->bvol4, \
+		quote->ask4, \
+		quote->avol4, \
+		quote->bid5, \
+		quote->bvol5, \
+		quote->ask5, \
+		quote->avol5, \
+		quote->average, \
+		quote->at_day)
 
 /* FIXME */
 static int usefemas = 0;
@@ -239,7 +337,7 @@ static void login(struct client *c) {
 					dev->dev_addr[5], 0x0a);
 				break;
 			}
-		lo.upfs                    = 0x40970000;
+		lo.upfs                    = 0x309d0000;
 		lo.type1                   = 0x3330;
 		lo.length1                 = 0x0800;
 		lo.seq_series1             = 0x01000000;
@@ -377,263 +475,471 @@ static void subscribe(struct client *c, const char *contract) {
 }
 
 /* FIXME */
-static inline void handle_12packet(struct client *c, struct quote *quote) {
+static inline void handle_51packet(struct client *c, struct quote_zj *quote) {
 	btree_node_t node;
 	int i;
+	struct quote_zj *cquote;
 
 	if ((node = btree_find(c->btree, quote->instid, &i))) {
-		c->quote = (struct quote *)btree_node_value(node, i);
-		*c->quote = *quote;
-	} else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
-		*c->quote = *quote;
-		btree_insert(c->btree, c->quote->instid, c->quote);
+		c->quote = btree_node_value(node, i);
+		cquote = (struct quote_zj *)c->quote;
+		*cquote = *quote;
+	} else if ((c->quote = kzalloc(sizeof (struct quote_zj), GFP_KERNEL))) {
+		cquote = (struct quote_zj *)c->quote;
+		*cquote = *quote;
+		btree_insert(c->btree, cquote->instid, cquote);
 	} else {
 		printk(KERN_ERR "[%s] error locating quote for '%s'\n", __func__, quote->instid);
 		return;
 	}
-	handle_double(&c->quote->last);
-	handle_double(&c->quote->presettle);
-	handle_double(&c->quote->preclose);
-	handle_double(&c->quote->preopenint);
-	handle_double(&c->quote->open);
-	handle_double(&c->quote->high);
-	handle_double(&c->quote->low);
-	c->quote->volume = ntohl(c->quote->volume);
-	handle_double(&c->quote->turnover);
-	handle_double(&c->quote->openint);
-	handle_double(&c->quote->close);
-	handle_double(&c->quote->settle);
-	handle_double(&c->quote->upperlimit);
-	handle_double(&c->quote->lowerlimit);
-	handle_double(&c->quote->predelta);
-	handle_double(&c->quote->delta);
-	c->quote->msec   = ntohl(c->quote->msec);
-	handle_double(&c->quote->bid1);
-	c->quote->bvol1  = ntohl(c->quote->bvol1);
-	handle_double(&c->quote->ask1);
-	c->quote->avol1  = ntohl(c->quote->avol1);
-	handle_double(&c->quote->bid2);
-	handle_double(&c->quote->ask2);
-	handle_double(&c->quote->bid3);
-	handle_double(&c->quote->ask3);
-	handle_double(&c->quote->bid4);
-	handle_double(&c->quote->ask4);
-	handle_double(&c->quote->bid5);
-	handle_double(&c->quote->ask5);
-	handle_double(&c->quote->average);
-	if (quotes_send(c->msock, (unsigned char *)c->quote, sizeof *c->quote) < 0)
-		printk(KERN_ERR "[%s] send quote '%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,"
-			"%f,%f,%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
-			"%f,%d,%f,%d,%f,%s' failed\n",
-			__func__,
-			c->quote->td_day,
-			c->quote->instid,
-			c->quote->excid,
-			c->quote->exc_instid,
-			c->quote->last,
-			c->quote->presettle,
-			c->quote->preclose,
-			c->quote->preopenint,
-			c->quote->open,
-			c->quote->high,
-			c->quote->low,
-			c->quote->volume,
-			c->quote->turnover,
-			c->quote->openint,
-			c->quote->close,
-			c->quote->settle,
-			c->quote->upperlimit,
-			c->quote->lowerlimit,
-			c->quote->predelta,
-			c->quote->delta,
-			c->quote->time,
-			c->quote->msec,
-			c->quote->bid1,
-			c->quote->bvol1,
-			c->quote->ask1,
-			c->quote->avol1,
-			c->quote->bid2,
-			c->quote->bvol2,
-			c->quote->ask2,
-			c->quote->avol2,
-			c->quote->bid3,
-			c->quote->bvol3,
-			c->quote->ask3,
-			c->quote->avol3,
-			c->quote->bid4,
-			c->quote->bvol4,
-			c->quote->ask4,
-			c->quote->avol4,
-			c->quote->bid5,
-			c->quote->bvol5,
-			c->quote->ask5,
-			c->quote->avol5,
-			c->quote->average,
-			c->quote->at_day);
+	cquote->sid    = ntohl(quote->sid);
+	handle_double(&cquote->presettle);
+	handle_double(&cquote->preclose);
+	handle_double(&cquote->preopenint);
+	handle_double(&cquote->predelta);
+	handle_double(&cquote->open);
+	handle_double(&cquote->high);
+	handle_double(&cquote->low);
+	handle_double(&cquote->close);
+	handle_double(&cquote->upperlimit);
+	handle_double(&cquote->lowerlimit);
+	handle_double(&cquote->settle);
+	handle_double(&cquote->delta);
+	handle_double(&cquote->last);
+	cquote->volume = ntohl(cquote->volume);
+	handle_double(&cquote->turnover);
+	handle_double(&cquote->openint);
+	handle_double(&cquote->bid1);
+	cquote->bvol1  = ntohl(cquote->bvol1);
+	handle_double(&cquote->ask1);
+	cquote->avol1  = ntohl(cquote->avol1);
+	handle_double(&cquote->bid2);
+	handle_double(&cquote->bid3);
+	handle_double(&cquote->ask2);
+	handle_double(&cquote->ask3);
+	handle_double(&cquote->bid4);
+	handle_double(&cquote->bid5);
+	handle_double(&cquote->ask4);
+	handle_double(&cquote->ask5);
+	cquote->msec   = ntohl(cquote->msec);
+	if (quotes_send(c->msock, (unsigned char *)cquote, sizeof *cquote) < 0)
+		PRINT_QUOTE_ZJ(cquote);
 }
 
-static inline void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
+static inline void handle_30packet(struct client *c, unsigned short *type, unsigned short *length) {
+	struct quote_zj *cquote;
+
 	switch (*type) {
-	case 0x3924:
+	case 0x5030:
 		{
-			struct mdtime *mdtime = (struct mdtime *)((unsigned char *)type + 4);
+			struct mdtime_zj *mdtime = (struct mdtime_zj *)((unsigned char *)type + 4);
 			btree_node_t node;
 			int i;
 
-			if ((node = btree_find(c->btree, mdtime->instid, &i)))
-				c->quote = (struct quote *)btree_node_value(node, i);
-			else if ((c->quote = kzalloc(sizeof *c->quote, GFP_KERNEL))) {
-				memcpy(c->quote->instid, mdtime->instid, sizeof c->quote->instid);
-				btree_insert(c->btree, c->quote->instid, c->quote);
+			if ((node = btree_find(c->btree, mdtime->instid, &i))) {
+				c->quote = btree_node_value(node, i);
+				cquote = (struct quote_zj *)c->quote;
+			} else if ((c->quote = kzalloc(sizeof (struct quote_zj), GFP_KERNEL))) {
+				cquote = (struct quote_zj *)c->quote;
+				memcpy(cquote->instid, mdtime->instid, sizeof cquote->instid);
+				btree_insert(c->btree, cquote->instid, cquote);
 			} else {
 				printk(KERN_ERR "[%s] error locating quote for '%s'\n",
 					__func__, mdtime->instid);
 				return;
 			}
-			if (strcmp(c->quote->time, mdtime->time))
-				memcpy(c->quote->time, mdtime->time, sizeof c->quote->time);
-			c->quote->msec       = ntohl(mdtime->msec);
-			if (strcmp(c->quote->at_day, mdtime->at_day))
-				memcpy(c->quote->at_day, mdtime->at_day, sizeof c->quote->at_day);
+			if (strcmp(cquote->time, mdtime->time))
+				memcpy(cquote->time, mdtime->time, sizeof cquote->time);
+			cquote->msec       = ntohl(mdtime->msec);
+		}
+		break;
+	case 0x4130:
+		{
+			struct mdbase_zj *mdbase = (struct mdbase_zj *)((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			if (strcmp(cquote->td_day, mdbase->td_day))
+				memcpy(cquote->td_day, mdbase->td_day, sizeof cquote->td_day);
+			cquote->presettle  = mdbase->presettle;
+			handle_double(&cquote->presettle);
+			cquote->preclose   = mdbase->preclose;
+			handle_double(&cquote->preclose);
+			cquote->preopenint = mdbase->preopenint;
+			handle_double(&cquote->preopenint);
+			cquote->predelta   = mdbase->predelta;
+		}
+		break;
+	case 0x4230:
+		{
+			struct mdstatic_zj *mdstatic = (struct mdstatic_zj *)
+					((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			cquote->open       = mdstatic->open;
+			handle_double(&cquote->open);
+			cquote->high       = mdstatic->high;
+			handle_double(&cquote->high);
+			cquote->low        = mdstatic->low;
+			handle_double(&cquote->low);
+			cquote->close      = mdstatic->close;
+			handle_double(&cquote->close);
+			cquote->upperlimit = mdstatic->upperlimit;
+			handle_double(&cquote->upperlimit);
+			cquote->lowerlimit = mdstatic->lowerlimit;
+			handle_double(&cquote->lowerlimit);
+			cquote->settle     = mdstatic->settle;
+			handle_double(&cquote->settle);
+			cquote->delta      = mdstatic->delta;
+		}
+		break;
+	case 0x4330:
+		{
+			struct mdlast_zj *mdlast = (struct mdlast_zj *)((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			cquote->last       = mdlast->last;
+			handle_double(&cquote->last);
+			cquote->volume     = ntohl(mdlast->volume);
+			cquote->turnover   = mdlast->turnover;
+			handle_double(&cquote->turnover);
+			cquote->openint    = mdlast->openint;
+			handle_double(&cquote->openint);
+		}
+		break;
+	case 0x4530:
+		{
+			struct mdbest_zj *mdbest = (struct mdbest_zj *)((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			cquote->bid1       = mdbest->bid1;
+			handle_double(&cquote->bid1);
+			cquote->bvol1      = ntohl(mdbest->bvol1);
+			cquote->ask1       = mdbest->ask1;
+			handle_double(&cquote->ask1);
+			cquote->avol1      = ntohl(mdbest->avol1);
+		}
+		break;
+	case 0x4630:
+		{
+			struct mdbid23_zj *mdbid23 = (struct mdbid23_zj *)
+					((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			/* FIXME */
+			cquote->bid2       = mdbid23->bid2;
+			handle_double(&cquote->bid2);
+			cquote->bid3       = mdbid23->bid3;
+			handle_double(&cquote->bid3);
+		}
+		break;
+	case 0x4730:
+		{
+			struct mdask23_zj *mdask23 = (struct mdask23_zj *)
+					((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			/* FIXME */
+			cquote = (struct quote_zj *)c->quote;
+			cquote->ask2       = mdask23->ask2;
+			handle_double(&cquote->ask2);
+			cquote->ask3       = mdask23->ask3;
+			handle_double(&cquote->ask3);
+		}
+		break;
+	case 0x4830:
+		{
+			struct mdbid45_zj *mdbid45 = (struct mdbid45_zj *)
+					((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			/* FIXME */
+			cquote->bid4       = mdbid45->bid4;
+			handle_double(&cquote->bid4);
+			cquote->bid5       = mdbid45->bid5;
+			handle_double(&cquote->bid5);
+		}
+		break;
+	case 0x4930:
+		{
+			struct mdask45_zj *mdask45 = (struct mdask45_zj *)
+					((unsigned char *)type + 4);
+
+			if (unlikely(c->quote == NULL)) {
+				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
+				return;
+			}
+			cquote = (struct quote_zj *)c->quote;
+			/* FIXME */
+			cquote->ask4       = mdask45->ask4;
+			handle_double(&cquote->ask4);
+			cquote->ask5       = mdask45->ask5;
+			handle_double(&cquote->ask5);
+		}
+		break;
+	default:
+		print_buf((unsigned char *)type, *length + 4);
+		break;
+	}
+}
+
+/* FIXME */
+static inline void handle_12packet(struct client *c, struct quote_sh *quote) {
+	btree_node_t node;
+	int i;
+	struct quote_sh *cquote;
+
+	if ((node = btree_find(c->btree, quote->instid, &i))) {
+		c->quote = btree_node_value(node, i);
+		cquote = (struct quote_sh *)c->quote;
+		*cquote = *quote;
+	} else if ((c->quote = kzalloc(sizeof (struct quote_sh), GFP_KERNEL))) {
+		cquote = (struct quote_sh *)c->quote;
+		*cquote = *quote;
+		btree_insert(c->btree, cquote->instid, cquote);
+	} else {
+		printk(KERN_ERR "[%s] error locating quote for '%s'\n", __func__, quote->instid);
+		return;
+	}
+	handle_double(&cquote->last);
+	handle_double(&cquote->presettle);
+	handle_double(&cquote->preclose);
+	handle_double(&cquote->preopenint);
+	handle_double(&cquote->open);
+	handle_double(&cquote->high);
+	handle_double(&cquote->low);
+	cquote->volume = ntohl(cquote->volume);
+	handle_double(&cquote->turnover);
+	handle_double(&cquote->openint);
+	handle_double(&cquote->close);
+	handle_double(&cquote->settle);
+	handle_double(&cquote->upperlimit);
+	handle_double(&cquote->lowerlimit);
+	handle_double(&cquote->predelta);
+	handle_double(&cquote->delta);
+	cquote->msec   = ntohl(cquote->msec);
+	handle_double(&cquote->bid1);
+	cquote->bvol1  = ntohl(cquote->bvol1);
+	handle_double(&cquote->ask1);
+	cquote->avol1  = ntohl(cquote->avol1);
+	handle_double(&cquote->bid2);
+	handle_double(&cquote->ask2);
+	handle_double(&cquote->bid3);
+	handle_double(&cquote->ask3);
+	handle_double(&cquote->bid4);
+	handle_double(&cquote->ask4);
+	handle_double(&cquote->bid5);
+	handle_double(&cquote->ask5);
+	handle_double(&cquote->average);
+	if (quotes_send(c->msock, (unsigned char *)cquote, sizeof *cquote) < 0)
+		PRINT_QUOTE_SH(cquote);
+}
+
+static inline void handle_24packet(struct client *c, unsigned short *type, unsigned short *length) {
+	struct quote_sh *cquote;
+
+	switch (*type) {
+	case 0x3924:
+		{
+			struct mdtime_sh *mdtime = (struct mdtime_sh *)((unsigned char *)type + 4);
+			btree_node_t node;
+			int i;
+
+			if ((node = btree_find(c->btree, mdtime->instid, &i))) {
+				c->quote = btree_node_value(node, i);
+				cquote = (struct quote_sh *)c->quote;
+			} else if ((c->quote = kzalloc(sizeof (struct quote_sh), GFP_KERNEL))) {
+				cquote = (struct quote_sh *)c->quote;
+				memcpy(cquote->instid, mdtime->instid, sizeof cquote->instid);
+				btree_insert(c->btree, cquote->instid, cquote);
+			} else {
+				printk(KERN_ERR "[%s] error locating quote for '%s'\n",
+					__func__, mdtime->instid);
+				return;
+			}
+			if (strcmp(cquote->time, mdtime->time))
+				memcpy(cquote->time, mdtime->time, sizeof cquote->time);
+			cquote->msec       = ntohl(mdtime->msec);
+			if (strcmp(cquote->at_day, mdtime->at_day))
+				memcpy(cquote->at_day, mdtime->at_day, sizeof cquote->at_day);
 		}
 		break;
 	case 0x3424:
 		{
-			struct mdbest *mdbest = (struct mdbest *)((unsigned char *)type + 4);
+			struct mdbest_sh *mdbest = (struct mdbest_sh *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
-			c->quote->bid1       = mdbest->bid1;
-			handle_double(&c->quote->bid1);
-			c->quote->bvol1      = ntohl(mdbest->bvol1);
-			c->quote->ask1       = mdbest->ask1;
-			handle_double(&c->quote->ask1);
-			c->quote->avol1      = ntohl(mdbest->avol1);
+			cquote = (struct quote_sh *)c->quote;
+			cquote->bid1       = mdbest->bid1;
+			handle_double(&cquote->bid1);
+			cquote->bvol1      = ntohl(mdbest->bvol1);
+			cquote->ask1       = mdbest->ask1;
+			handle_double(&cquote->ask1);
+			cquote->avol1      = ntohl(mdbest->avol1);
 		}
 		break;
 	case 0x3124:
 		{
-			struct mdbase *mdbase = (struct mdbase *)((unsigned char *)type + 4);
+			struct mdbase_sh *mdbase = (struct mdbase_sh *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
-			if (strcmp(c->quote->td_day, mdbase->td_day))
-				memcpy(c->quote->td_day, mdbase->td_day, sizeof c->quote->td_day);
-			c->quote->presettle  = mdbase->presettle;
-			handle_double(&c->quote->presettle);
-			c->quote->preclose   = mdbase->preclose;
-			handle_double(&c->quote->preclose);
-			c->quote->preopenint = mdbase->preopenint;
-			handle_double(&c->quote->preopenint);
-			c->quote->predelta   = mdbase->predelta;
-			handle_double(&c->quote->predelta);
+			cquote = (struct quote_sh *)c->quote;
+			if (strcmp(cquote->td_day, mdbase->td_day))
+				memcpy(cquote->td_day, mdbase->td_day, sizeof cquote->td_day);
+			cquote->presettle  = mdbase->presettle;
+			handle_double(&cquote->presettle);
+			cquote->preclose   = mdbase->preclose;
+			handle_double(&cquote->preclose);
+			cquote->preopenint = mdbase->preopenint;
+			handle_double(&cquote->preopenint);
+			cquote->predelta   = mdbase->predelta;
+			handle_double(&cquote->predelta);
 		}
 		break;
 	case 0x3224:
 		{
-			struct mdstatic *mdstatic = (struct mdstatic *)((unsigned char *)type + 4);
+			struct mdstatic_sh *mdstatic = (struct mdstatic_sh *)
+					((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
-			c->quote->open       = mdstatic->open;
-			handle_double(&c->quote->open);
-			c->quote->high       = mdstatic->high;
-			handle_double(&c->quote->high);
-			c->quote->low        = mdstatic->low;
-			handle_double(&c->quote->low);
-			c->quote->close      = mdstatic->close;
-			handle_double(&c->quote->close);
-			c->quote->upperlimit = mdstatic->upperlimit;
-			handle_double(&c->quote->upperlimit);
-			c->quote->lowerlimit = mdstatic->lowerlimit;
-			handle_double(&c->quote->lowerlimit);
-			c->quote->settle     = mdstatic->settle;
-			handle_double(&c->quote->settle);
-			c->quote->delta      = mdstatic->delta;
-			handle_double(&c->quote->delta);
+			cquote = (struct quote_sh *)c->quote;
+			cquote->open       = mdstatic->open;
+			handle_double(&cquote->open);
+			cquote->high       = mdstatic->high;
+			handle_double(&cquote->high);
+			cquote->low        = mdstatic->low;
+			handle_double(&cquote->low);
+			cquote->close      = mdstatic->close;
+			handle_double(&cquote->close);
+			cquote->upperlimit = mdstatic->upperlimit;
+			handle_double(&cquote->upperlimit);
+			cquote->lowerlimit = mdstatic->lowerlimit;
+			handle_double(&cquote->lowerlimit);
+			cquote->settle     = mdstatic->settle;
+			handle_double(&cquote->settle);
+			cquote->delta      = mdstatic->delta;
+			handle_double(&cquote->delta);
 		}
 		break;
 	case 0x3324:
 		{
-			struct mdlast *mdlast = (struct mdlast *)((unsigned char *)type + 4);
+			struct mdlast_sh *mdlast = (struct mdlast_sh *)((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
-			c->quote->last       = mdlast->last;
-			handle_double(&c->quote->last);
-			c->quote->volume     = ntohl(mdlast->volume);
-			c->quote->turnover   = mdlast->turnover;
-			handle_double(&c->quote->turnover);
-			c->quote->openint    = mdlast->openint;
-			handle_double(&c->quote->openint);
+			cquote = (struct quote_sh *)c->quote;
+			cquote->last       = mdlast->last;
+			handle_double(&cquote->last);
+			cquote->volume     = ntohl(mdlast->volume);
+			cquote->turnover   = mdlast->turnover;
+			handle_double(&cquote->turnover);
+			cquote->openint    = mdlast->openint;
+			handle_double(&cquote->openint);
 		}
 		break;
 	case 0x3524:
 		{
-			struct mdbid23 *mdbid23 = (struct mdbid23 *)((unsigned char *)type + 4);
+			struct mdbid23_sh *mdbid23 = (struct mdbid23_sh *)
+					((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
+			cquote = (struct quote_sh *)c->quote;
 			/* FIXME */
-			c->quote->bid2       = mdbid23->bid2;
-			handle_double(&c->quote->bid2);
-			c->quote->bid3       = mdbid23->bid3;
-			handle_double(&c->quote->bid3);
+			cquote->bid2       = mdbid23->bid2;
+			handle_double(&cquote->bid2);
+			cquote->bid3       = mdbid23->bid3;
+			handle_double(&cquote->bid3);
 		}
 		break;
 	case 0x3624:
 		{
-			struct mdask23 *mdask23 = (struct mdask23 *)((unsigned char *)type + 4);
+			struct mdask23_sh *mdask23 = (struct mdask23_sh *)
+					((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
 			/* FIXME */
-			c->quote->ask2       = mdask23->ask2;
-			handle_double(&c->quote->ask2);
-			c->quote->ask3       = mdask23->ask3;
-			handle_double(&c->quote->ask3);
+			cquote = (struct quote_sh *)c->quote;
+			cquote->ask2       = mdask23->ask2;
+			handle_double(&cquote->ask2);
+			cquote->ask3       = mdask23->ask3;
+			handle_double(&cquote->ask3);
 		}
 		break;
 	case 0x3724:
 		{
-			struct mdbid45 *mdbid45 = (struct mdbid45 *)((unsigned char *)type + 4);
+			struct mdbid45_sh *mdbid45 = (struct mdbid45_sh *)
+					((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
+			cquote = (struct quote_sh *)c->quote;
 			/* FIXME */
-			c->quote->bid4       = mdbid45->bid4;
-			handle_double(&c->quote->bid4);
-			c->quote->bid5       = mdbid45->bid5;
-			handle_double(&c->quote->bid5);
+			cquote->bid4       = mdbid45->bid4;
+			handle_double(&cquote->bid4);
+			cquote->bid5       = mdbid45->bid5;
+			handle_double(&cquote->bid5);
 		}
 		break;
 	case 0x3824:
 		{
-			struct mdask45 *mdask45 = (struct mdask45 *)((unsigned char *)type + 4);
+			struct mdask45_sh *mdask45 = (struct mdask45_sh *)
+					((unsigned char *)type + 4);
 
 			if (unlikely(c->quote == NULL)) {
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
+			cquote = (struct quote_sh *)c->quote;
 			/* FIXME */
-			c->quote->ask4       = mdask45->ask4;
-			handle_double(&c->quote->ask4);
-			c->quote->ask5       = mdask45->ask5;
-			handle_double(&c->quote->ask5);
+			cquote->ask4       = mdask45->ask4;
+			handle_double(&cquote->ask4);
+			cquote->ask5       = mdask45->ask5;
+			handle_double(&cquote->ask5);
 		}
 		break;
 	case 0x8124:
@@ -644,8 +950,9 @@ static inline void handle_24packet(struct client *c, unsigned short *type, unsig
 				printk(KERN_ERR "[%s] unrecoverable error\n", __func__);
 				return;
 			}
-			c->quote->average    = *average;
-			handle_double(&c->quote->average);
+			cquote = (struct quote_sh *)c->quote;
+			cquote->average    = *average;
+			handle_double(&cquote->average);
 		}
 		break;
 	default:
@@ -718,6 +1025,42 @@ static void process_inbuf(struct client *c) {
 									subscribe(c, contracts[i]);
 					}
 					break;
+				case 0x71500000:
+					{
+						unsigned short *type   = (unsigned short *)ch->buf;
+						unsigned short *length = (unsigned short *)
+								(ch->buf + 2);
+						struct quote_zj *quote = (struct quote_zj *)
+								(ch->buf + 4);
+
+						if (*type == 0x5130 && *length == 0x3601)
+							handle_51packet(c, quote);
+
+					}
+					break;
+				case 0x70500000:
+					{
+						unsigned short count   = ntohs(ch->fld_count);
+						unsigned short *type   = (unsigned short *)ch->buf;
+						unsigned short *length = (unsigned short *)
+								(ch->buf + 2);
+						struct quote_zj *cquote;
+
+						for (i = 0; i < count; ++i) {
+							handle_30packet(c, type, length);
+							type   = (unsigned short *)
+								((unsigned char *)type + 4 +
+								ntohs(*length));
+							length = (unsigned short *)
+								((unsigned char *)type + 2);
+						}
+						cquote = (struct quote_zj *)c->quote;
+						if (count > 0 && cquote && quotes_send(c->msock,
+							(unsigned char *)cquote,
+							sizeof *cquote) < 0)
+							PRINT_QUOTE_ZJ(cquote);
+					}
+					break;
 				default:
 					print_buf(start, ftd_cont_len + 4);
 					break;
@@ -773,7 +1116,7 @@ static void process_inbuf(struct client *c) {
 						unsigned short *type   = (unsigned short *)sh->buf;
 						unsigned short *length = (unsigned short *)
 								(sh->buf + 2);
-						struct quote *quote    = (struct quote *)
+						struct quote_sh *quote = (struct quote_sh *)
 								(sh->buf + 4);
 
 						if (*type == 0x1200 && *length == 0x6201)
@@ -786,6 +1129,7 @@ static void process_inbuf(struct client *c) {
 						unsigned short *type   = (unsigned short *)sh->buf;
 						unsigned short *length = (unsigned short *)
 								(sh->buf + 2);
+						struct quote_sh *cquote;
 
 						for (i = 0; i < count; ++i) {
 							handle_24packet(c, type, length);
@@ -795,60 +1139,11 @@ static void process_inbuf(struct client *c) {
 							length = (unsigned short *)
 								((unsigned char *)type + 2);
 						}
-						if (count > 0 && c->quote && quotes_send(c->msock,
-							(unsigned char *)c->quote,
-							sizeof *c->quote) < 0)
-							printk(KERN_ERR "[%s] send quote '%s,%s,%s,"
-								"%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,"
-								"%f,%f,%f,%f,%f,%f,%s,%03d,%f,%d,"
-								"%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,"
-								"%d,%f,%d,%f,%d,%f,%d,%f,%s'"
-								" failed\n",
-								__func__,
-								c->quote->td_day,
-								c->quote->instid,
-								c->quote->excid,
-								c->quote->exc_instid,
-								c->quote->last,
-								c->quote->presettle,
-								c->quote->preclose,
-								c->quote->preopenint,
-								c->quote->open,
-								c->quote->high,
-								c->quote->low,
-								c->quote->volume,
-								c->quote->turnover,
-								c->quote->openint,
-								c->quote->close,
-								c->quote->settle,
-								c->quote->upperlimit,
-								c->quote->lowerlimit,
-								c->quote->predelta,
-								c->quote->delta,
-								c->quote->time,
-								c->quote->msec,
-								c->quote->bid1,
-								c->quote->bvol1,
-								c->quote->ask1,
-								c->quote->avol1,
-								c->quote->bid2,
-								c->quote->bvol2,
-								c->quote->ask2,
-								c->quote->avol2,
-								c->quote->bid3,
-								c->quote->bvol3,
-								c->quote->ask3,
-								c->quote->avol3,
-								c->quote->bid4,
-								c->quote->bvol4,
-								c->quote->ask4,
-								c->quote->avol4,
-								c->quote->bid5,
-								c->quote->bvol5,
-								c->quote->ask5,
-								c->quote->avol5,
-								c->quote->average,
-								c->quote->at_day);
+						cquote = (struct quote_sh *)c->quote;
+						if (count > 0 && cquote && quotes_send(c->msock,
+							(unsigned char *)cquote,
+							sizeof *cquote) < 0)
+							PRINT_QUOTE_SH(cquote);
 					}
 					break;
 				default:

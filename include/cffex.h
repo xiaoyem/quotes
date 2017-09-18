@@ -108,6 +108,110 @@ struct loginrsp {
 	int			pf_size;          /* PrivateFlowSize */
 	int			uf_size;          /* UserFlowSize */
 };
+struct quote_zj {
+	char			td_day[9];        /* TradingDay */
+	char			sgid[9];          /* SettlementGroupID */
+	int			sid;              /* SettlementID */
+	double			presettle;        /* PreSettlementPrice */
+	double			preclose;         /* PreClosePrice */
+	double			preopenint;       /* PreOpenInterest */
+	double			predelta;         /* PreDelta */
+	double			open;             /* OpenPrice */
+	double			high;             /* HighestPrice */
+	double			low;              /* LowestPrice */
+	double			close;            /* ClosePrice */
+	double			upperlimit;       /* UpperLimitPrice */
+	double			lowerlimit;       /* LowerLimitPrice */
+	double			settle;           /* SettlementPrice */
+	double			delta;            /* CurrDelta */
+	double			last;             /* LastPrice */
+	int			volume;           /* Volume */
+	double			turnover;         /* Turnover */
+	double			openint;          /* OpenInterest */
+	double			bid1;             /* BidPrice1 */
+	int			bvol1;            /* BidVolume1 */
+	double			ask1;             /* AskPrice1 */
+	int			avol1;            /* AskVolume1 */
+	double			bid2;             /* BidPrice2 */
+	int			bvol2;            /* BidVolume2 */
+	double			bid3;             /* BidPrice3 */
+	int			bvol3;            /* BidVolume3 */
+	double			ask2;             /* AskPrice2 */
+	int			avol2;            /* AskVolume2 */
+	double			ask3;             /* AskPrice3 */
+	int			avol3;            /* AskVolume3 */
+	double			bid4;             /* BidPrice4 */
+	int			bvol4;            /* BidVolume4 */
+	double			bid5;             /* BidPrice5 */
+	int			bvol5;            /* BidVolume5 */
+	double			ask4;             /* AskPrice4 */
+	int			avol4;            /* AskVolume4 */
+	double			ask5;             /* AskPrice5 */
+	int			avol5;            /* AskVolume5 */
+	char			instid[31];       /* InstrumentID */
+	char			time[9];          /* UpdateTime */
+	int			msec;             /* UpdateMillisec */
+};
+struct mdbase_zj {
+	char			td_day[9];        /* TradingDay */
+	char			sgid[9];          /* SettlementGroupID */
+	int			sid;              /* SettlementID */
+	double			presettle;        /* PreSettlementPrice */
+	double			preclose;         /* PreClosePrice */
+	double			preopenint;       /* PreOpenInterest */
+	double			predelta;         /* PreDelta */
+};
+struct mdstatic_zj {
+	double			open;             /* OpenPrice */
+	double			high;             /* HighestPrice */
+	double			low;              /* LowestPrice */
+	double			close;            /* ClosePrice */
+	double			upperlimit;       /* UpperLimitPrice */
+	double			lowerlimit;       /* LowerLimitPrice */
+	double			settle;           /* SettlementPrice */
+	double			delta;            /* CurrDelta */
+};
+struct mdlast_zj {
+	double			last;             /* LastPrice */
+	int			volume;           /* Volume */
+	double			turnover;         /* Turnover */
+	double			openint;          /* OpenInterest */
+};
+struct mdbest_zj {
+	double			bid1;             /* BidPrice1 */
+	int			bvol1;            /* BidVolume1 */
+	double			ask1;             /* AskPrice1 */
+	int			avol1;            /* AskVolume1 */
+};
+struct mdbid23_zj {
+	double			bid2;             /* BidPrice2 */
+	int			bvol2;            /* BidVolume2 */
+	double			bid3;             /* BidPrice3 */
+	int			bvol3;            /* BidVolume3 */
+};
+struct mdask23_zj {
+	double			ask2;             /* AskPrice2 */
+	int			avol2;            /* AskVolume2 */
+	double			ask3;             /* AskPrice3 */
+	int			avol3;            /* AskVolume3 */
+};
+struct mdbid45_zj {
+	double			bid4;             /* BidPrice4 */
+	int			bvol4;            /* BidVolume4 */
+	double			bid5;             /* BidPrice5 */
+	int			bvol5;            /* BidVolume5 */
+};
+struct mdask45_zj {
+	double			ask4;             /* AskPrice4 */
+	int			avol4;            /* AskVolume4 */
+	double			ask5;             /* AskPrice5 */
+	int			avol5;            /* AskVolume5 */
+};
+struct mdtime_zj {
+	char			instid[31];       /* InstrumentID */
+	char			time[9];          /* UpdateTime */
+	int			msec;             /* UpdateMillisec */
+};
 #pragma pack(pop)
 
 #endif /* CFFEX_INCLUDED */
