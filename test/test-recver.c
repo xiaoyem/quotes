@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "shfe.h"
+#include "cffex.h"
 
 /* FIXME */
 static void usage(void) {
@@ -88,60 +89,114 @@ int main(int argc, char **argv) {
 	rfd[0].events = POLLIN;
 	while (1) {
 		struct timespec timeout = {0, 5};
-		struct quote_sh quote;
+		char buf[1024];
 		socklen_t slen = sizeof sa;
+		ssize_t nbytes;
 
 		/* FIXME */
 		ppoll(rfd, 1, &timeout, NULL);
-		if (rfd[0].revents & POLLIN &&
-			recvfrom(sock, &quote, sizeof quote, 0, (struct sockaddr *)&sa, &slen) > 0)
-			fprintf(stdout, "%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,%f,%f,%f,"
-				"%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
-				"%f,%d,%f,%s\n",
-				quote.td_day,
-				quote.instid,
-				quote.excid,
-				quote.exc_instid,
-				quote.last,
-				quote.presettle,
-				quote.preclose,
-				quote.preopenint,
-				quote.open,
-				quote.high,
-				quote.low,
-				quote.volume,
-				quote.turnover,
-				quote.openint,
-				quote.close,
-				quote.settle,
-				quote.upperlimit,
-				quote.lowerlimit,
-				quote.predelta,
-				quote.delta,
-				quote.time,
-				quote.msec,
-				quote.bid1,
-				quote.bvol1,
-				quote.ask1,
-				quote.avol1,
-				quote.bid2,
-				quote.bvol2,
-				quote.ask2,
-				quote.avol2,
-				quote.bid3,
-				quote.bvol3,
-				quote.ask3,
-				quote.avol3,
-				quote.bid4,
-				quote.bvol4,
-				quote.ask4,
-				quote.avol4,
-				quote.bid5,
-				quote.bvol5,
-				quote.ask5,
-				quote.avol5,
-				quote.average,
-				quote.at_day);
+		if (rfd[0].revents & POLLIN && (nbytes =
+			recvfrom(sock, buf, sizeof buf, 0, (struct sockaddr *)&sa, &slen)) > 0) {
+			if (nbytes == sizeof (struct quote_zj)) {
+				struct quote_zj *quote = (struct quote_zj *)buf;
+
+				fprintf(stdout, "%s,%s,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,"
+					"%d,%f,%f,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
+					"%f,%d,%f,%d,%s,%s,%03d\n",
+					quote->td_day,
+					quote->sgid,
+					quote->sid,
+					quote->presettle,
+					quote->preclose,
+					quote->preopenint,
+					quote->predelta,
+					quote->open,
+					quote->high,
+					quote->low,
+					quote->close,
+					quote->upperlimit,
+					quote->lowerlimit,
+					quote->settle,
+					quote->delta,
+					quote->last,
+					quote->volume,
+					quote->turnover,
+					quote->openint,
+					quote->bid1,
+					quote->bvol1,
+					quote->ask1,
+					quote->avol1,
+					quote->bid2,
+					quote->bvol2,
+					quote->bid3,
+					quote->bvol3,
+					quote->ask2,
+					quote->avol2,
+					quote->ask3,
+					quote->avol3,
+					quote->bid4,
+					quote->bvol4,
+					quote->bid5,
+					quote->bvol5,
+					quote->ask4,
+					quote->avol4,
+					quote->ask5,
+					quote->avol5,
+					quote->instid,
+					quote->time,
+					quote->msec);
+			} else {
+				struct quote_sh *quote = (struct quote_sh *)buf;
+
+				fprintf(stdout, "%s,%s,%s,%s,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f,%f,%f,"
+					"%f,%f,%f,%f,%s,%03d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,%f,%d,"
+					"%f,%d,%f,%d,%f,%d,%f,%d,%f,%s\n",
+					quote->td_day,
+					quote->instid,
+					quote->excid,
+					quote->exc_instid,
+					quote->last,
+					quote->presettle,
+					quote->preclose,
+					quote->preopenint,
+					quote->open,
+					quote->high,
+					quote->low,
+					quote->volume,
+					quote->turnover,
+					quote->openint,
+					quote->close,
+					quote->settle,
+					quote->upperlimit,
+					quote->lowerlimit,
+					quote->predelta,
+					quote->delta,
+					quote->time,
+					quote->msec,
+					quote->bid1,
+					quote->bvol1,
+					quote->ask1,
+					quote->avol1,
+					quote->bid2,
+					quote->bvol2,
+					quote->ask2,
+					quote->avol2,
+					quote->bid3,
+					quote->bvol3,
+					quote->ask3,
+					quote->avol3,
+					quote->bid4,
+					quote->bvol4,
+					quote->ask4,
+					quote->avol4,
+					quote->bid5,
+					quote->bvol5,
+					quote->ask5,
+					quote->avol5,
+					quote->average,
+					quote->at_day);
+			}
+		}
 	}
 	return 0;
 }
