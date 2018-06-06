@@ -1,18 +1,3 @@
 
-Kernel module for futures quotes
-
-1) yum -y install kernel-devel
-2) make
-3) echo 3 >/proc/sys/net/ipv4/tcp_syn_retries
-4) insmod quotes.ko multicast_ip=<mc_ip> multicast_port=<mc_port> \
-   quote_ip=<qt_ip> quote_port=<qt_port> brokerid=<broker> userid=<user> \
-   passwd=<pass> contracts='"<cont1,cont2,cont3...>"'
-   OR
-   insmod quotes.ko usefemas=1 multicast_ip=<mc_ip> multicast_port=<mc_port> \
-   quote_ip=<qt_ip> quote_port=<qt_port> brokerid=<broker> userid=<user> \
-   passwd=<pass> contracts='"*"'
-5) ./test-recver <mc_ip> <mc_port>
-
-Try 'tuned-adm profile network-latency' if running on a non-virtual host.
-Don't ask Trade API any more, do it yourself!
+Migrated to https://bitbucket.org/xiaoyem/quotes
 
